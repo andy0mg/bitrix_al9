@@ -79,23 +79,23 @@ lib/
 
 ```bash
 vi /etc/bitrix-cluster.env
-# BITRIX_CLUSTER_REPO=https://github.com/YOURORG/bitrix_al9.git
+# BITRIX_CLUSTER_REPO=https://github.com/andy0mg/bitrix_al9.git
 # MYSQL_ROOT_PASSWORD=..., VIP=..., APP_SERVERS=...
 ```
 
 3. Запуск с любой VM (пример — app-сервер):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOURORG/bitrix_al9/main/cluster/run.sh -o /tmp/bitrix-run.sh
+curl -fsSL https://raw.githubusercontent.com/andy0mg/bitrix_al9/main/cluster/run.sh -o /tmp/bitrix-run.sh
 chmod +x /tmp/bitrix-run.sh
-env BITRIX_CLUSTER_REPO=https://github.com/YOURORG/bitrix_al9.git \
+env BITRIX_CLUSTER_REPO=https://github.com/andy0mg/bitrix_al9.git \
   /tmp/bitrix-run.sh app -s -c /etc/bitrix-cluster.env -H app1 --with-transformer
 ```
 
 Или если репозиторий уже клонирован локально:
 
 ```bash
-./cluster/run.sh -r https://github.com/YOURORG/bitrix_al9.git app -s -c /etc/bitrix-cluster.env -H app1
+./cluster/run.sh -r https://github.com/andy0mg/bitrix_al9.git app -s -c /etc/bitrix-cluster.env -H app1
 ```
 
 Параметры git:
