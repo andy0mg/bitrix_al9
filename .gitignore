@@ -1,0 +1,13 @@
+# Local secrets and SSH keys
+bitrix-cursor
+bitrix-cursor.pub
+cluster/cluster.env
+/etc/bitrix-cluster.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
