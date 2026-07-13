@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 #
-# Application server: nginx + httpd + php + memcached + optional transformer
+# Application server: nginx + php-fpm + memcached + optional transformer
 #
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/cluster-install.sh"
@@ -30,6 +30,7 @@ configure_catdoc
 configure_bitrix_env
 install_additional_packages
 configure_memcached
+configure_bitrix_nginx_php_fpm
 
 if [[ ${WITH_TRANSFORMER} -eq 1 ]] || [[ "${TRANSFORMER_ENABLED:-0}" == "1" ]]; then
     configure_transformer
@@ -56,8 +57,9 @@ else
     configure_firewall_ports 80/tcp 443/tcp 8080/tcp ${MEMCACHED_PORT:-11211}/tcp
 fi
 
-systemctl enable httpd nginx memcached >> ${LOGS_FILE} 2>&1
-systemctl restart httpd nginx memcached >> ${LOGS_FILE} 2>&1
+bitrix_enable_web_services
+systemctl enable memcached >> ${LOGS_FILE} 2>&1
+systemctl restart memcached >> ${LOGS_FILE} 2>&1
 
 enable_dnf_makecache
 print "Application server role installed." 3

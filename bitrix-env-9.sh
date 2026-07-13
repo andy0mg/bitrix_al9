@@ -84,6 +84,7 @@ then
 fi
 #
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+BITRIX_REPO_ROOT="${SCRIPT_DIR}"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib/bitrix-common.sh"
 
@@ -154,6 +155,7 @@ configure_push_server
 install_percona
 configure_bitrix_env
 install_additional_packages
+configure_bitrix_nginx_php_fpm
 prepare_ansible_config
 install_community_general_ansible_collection
 install_community_mysql_ansible_collection

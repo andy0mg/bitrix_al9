@@ -34,7 +34,7 @@
 | Роль | Скрипт | Компоненты |
 |------|--------|------------|
 | Балансировщик | `cluster/install-balancer.sh` | bx-nginx, keepalived, upstream на app-серверы |
-| Сервер приложений | `cluster/install-app.sh` | bitrix-env, nginx, httpd, PHP 8.2, memcached, опционально transformer |
+| Сервер приложений | `cluster/install-app.sh` | bitrix-env, nginx, PHP-FPM 8.2, memcached, опционально transformer |
 | Push-сервер | `cluster/install-push.sh` | Node.js 22, redis, bx-push-server |
 | MySQL master | `cluster/install-mysql-master.sh` | Percona Server 8.0/8.4, GTID, replication user |
 | MySQL slave | `cluster/install-mysql-slave.sh` | Percona Server, репликация с master |
@@ -251,6 +251,8 @@ env BITRIX_CLUSTER_REPO=https://github.com/andy0mg/bitrix_al9.git \
 ```
 
 Хосты (`MYSQL_MASTER`, `WS_HOST`, `OPENSEARCH_HOST` и др.) по умолчанию подставляются с IP этой VM.
+
+PHP обрабатывается через **nginx + php-fpm** (по умолчанию `BITRIX_PHP_HANDLER=fpm`). Для классической схемы с Apache задайте `BITRIX_PHP_HANDLER=httpd` в `cluster.env`.
 
 Подробная пошаговая инструкция с командами `dnf install`: [`cluster/FULL-NODE-INSTALL.md`](cluster/FULL-NODE-INSTALL.md).
 

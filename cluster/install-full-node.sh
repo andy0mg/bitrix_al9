@@ -24,7 +24,7 @@ Usage: install-full-node.sh [-h] [-s] [-c cluster.env] [-H hostname]
        [-M mysql_root_password] [-m 8.0|8.4] [-G pgsql_password] [-g pgsql_version]
        [--with-transformer]
 
-Installs Bitrix Environment 9 on a single VM: nginx, httpd, PHP, memcached,
+Installs Bitrix Environment 9 on a single VM: nginx, PHP-FPM, memcached,
 Percona MySQL, PostgreSQL, push server, OpenSearch; optionally transformer stack.
 EOF
             exit 0
@@ -57,6 +57,7 @@ install_percona
 configure_bitrix_env
 install_additional_packages
 configure_memcached
+configure_bitrix_nginx_php_fpm
 
 if [[ ${WITH_TRANSFORMER} -eq 1 ]] || [[ "${TRANSFORMER_ENABLED:-0}" == "1" ]]; then
     configure_transformer
@@ -122,8 +123,9 @@ WS_HOST=${WS_HOST:-$(hostname -I | awk '{print $1}')}
 configure_push_server_runtime
 
 systemctl daemon-reload >> ${LOGS_FILE} 2>&1
-systemctl enable httpd nginx memcached redis mysqld postgresql opensearch push-server >> ${LOGS_FILE} 2>&1
-systemctl restart httpd nginx memcached redis mysqld postgresql opensearch >> ${LOGS_FILE} 2>&1
+systemctl enable memcached redis mysqld postgresql opensearch push-server >> ${LOGS_FILE} 2>&1
+bitrix_enable_web_services
+systemctl restart memcached redis mysqld postgresql opensearch >> ${LOGS_FILE} 2>&1
 
 if [[ ${WITH_TRANSFORMER} -eq 1 ]] || [[ "${TRANSFORMER_ENABLED:-0}" == "1" ]]; then
     configure_firewall_ports 5672/tcp

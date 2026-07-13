@@ -109,25 +109,18 @@ dnf module disable php:remi-7.4 php:remi-8.0 php:remi-8.1 php:remi-8.3 php:remi-
 dnf module enable php:remi-8.2 -y
 dnf module install php:remi-8.2 -y
 
-# PHP и расширения для Bitrix
+# PHP, FPM и расширения для Bitrix (httpd не нужен)
 dnf -y install \
-  php php-mysqli php-pgsql \
+  php php-fpm php-mysqli php-pgsql \
   php-pecl-apcu php-pecl-zendopcache php-pecl-redis6 \
   php-pecl-msgpack php-pecl-igbinary
-
-# Убрать php-fpm (Bitrix использует httpd + mod_php)
-systemctl disable --now php-fpm 2>/dev/null || true
-dnf -y remove php-fpm
 ```
 
 ---
 
-## 4. Веб-сервер и Python
+## 4. Вспомогательные пакеты и пул PHP-FPM
 
 ```bash
-# Apache (backend за bx-nginx)
-dnf -y install httpd httpd-core httpd-devel httpd-filesystem httpd-tools
-
 # Python 3.11 — утилиты управления Bitrix
 dnf -y install \
   python3.11 python3.11-libs python3.11-pip-wheel python3.11-setuptools-wheel \
@@ -135,6 +128,22 @@ dnf -y install \
 
 # Дополнительные perl-модули и кодировки
 dnf -y install perl-lib perl-Sys-Hostname perl-IO-Interface perl-DBI perl-DBD-Pg glibc-gconv-extra
+```
+
+### Пул PHP-FPM (пользователь bitrix)
+
+```bash
+export PHP_FPM_SOCKET=/run/php-fpm/www.sock
+
+# После установки bitrix-env (создаёт пользователя bitrix)
+sed -i 's/^user = .*/user = bitrix/' /etc/php-fpm.d/www.conf
+sed -i 's/^group = .*/group = bitrix/' /etc/php-fpm.d/www.conf
+sed -i "s|^listen = .*|listen = ${PHP_FPM_SOCKET}|" /etc/php-fpm.d/www.conf
+sed -i 's/^;listen.owner = nobody/listen.owner = nginx/' /etc/php-fpm.d/www.conf
+sed -i 's/^;listen.group = nobody/listen.group = nginx/' /etc/php-fpm.d/www.conf
+sed -i 's/^;listen.mode = 0660/listen.mode = 0660/' /etc/php-fpm.d/www.conf
+
+systemctl enable --now php-fpm
 ```
 
 ---
@@ -208,7 +217,7 @@ dnf -y install bx-push-server
 ## 8. Пакеты Bitrix Environment
 
 ```bash
-# Основной мета-пакет: nginx-конфиги, httpd, ansible, push, утилиты /opt/webdir
+# Мета-пакет: nginx-конфиги, ansible, push, утилиты /opt/webdir (httpd не используется)
 dnf -y install bitrix-env
 
 # Просмотр doc/xls в Bitrix
@@ -216,6 +225,21 @@ dnf -y install bx-catdoc
 
 # Nginx из репозитория Bitrix (если не подтянулся с bitrix-env)
 dnf -y install bx-nginx
+
+# Переключить nginx на PHP-FPM (шаблон из репозитория)
+cp cluster/templates/nginx-bitrix-php-fpm.inc.tpl /etc/nginx/bx/conf/bitrix_php_fpm.inc
+sed -i "s|@PHP_FPM_SOCKET@|${PHP_FPM_SOCKET:-/run/php-fpm/www.sock}|g" /etc/nginx/bx/conf/bitrix_php_fpm.inc
+
+for conf in /etc/nginx/bx/site_enabled/*.conf; do
+  [[ -f "$conf" ]] || continue
+  grep -q bitrix_php_fpm.inc "$conf" || sed -i '/server_name/a \    include /etc/nginx/bx/conf/bitrix_php_fpm.inc;' "$conf"
+  sed -i 's|^\(\s*\)proxy_pass\s\+http://127.0.0.1:8080|\1# php-fpm: proxy_pass http://127.0.0.1:8080|' "$conf"
+  grep -q 'try_files $uri $uri/ @bitrix_php_fpm' "$conf" || \
+    sed -i 's|location / {|location / {\n        try_files $uri $uri/ @bitrix_php_fpm;|' "$conf"
+done
+
+systemctl disable --now httpd 2>/dev/null || true
+nginx -t && systemctl reload nginx
 ```
 
 ---
@@ -306,8 +330,8 @@ fi
 systemctl enable --now push-server
 
 # Перезапуск основных сервисов
-systemctl enable httpd nginx memcached redis mysqld postgresql opensearch push-server
-systemctl restart httpd nginx memcached redis mysqld postgresql opensearch push-server
+systemctl enable php-fpm nginx memcached redis mysqld postgresql opensearch push-server
+systemctl restart php-fpm nginx memcached redis mysqld postgresql opensearch push-server
 ```
 
 ---

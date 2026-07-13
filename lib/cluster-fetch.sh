@@ -29,7 +29,8 @@ cluster/cluster.env.example
         app)
             printf '%s\n' ${common} \
                 cluster/install-app.sh \
-                cluster/templates/transformer/transformer.env.tpl
+                cluster/templates/transformer/transformer.env.tpl \
+                cluster/templates/nginx-bitrix-php-fpm.inc.tpl
             ;;
         push)
             printf '%s\n' ${common} \
@@ -55,7 +56,8 @@ cluster/cluster.env.example
             printf '%s\n' ${common} \
                 cluster/install-full-node.sh \
                 cluster/templates/opensearch.yml.tpl \
-                cluster/templates/transformer/transformer.env.tpl
+                cluster/templates/transformer/transformer.env.tpl \
+                cluster/templates/nginx-bitrix-php-fpm.inc.tpl
             ;;
         *)
             echo "Unknown role: ${role}" >&2
@@ -174,8 +176,9 @@ cluster_prepare_role() {
     caller_dir=$(cd "$(dirname "${caller}")" && pwd)
 
     if [[ -f "${caller_dir}/../lib/bitrix-common.sh" ]]; then
-        cluster_set_paths_from_root "$(cd "${caller_dir}/.." && pwd)"
-        return 0
+    cluster_set_paths_from_root "$(cd "${caller_dir}/.." && pwd)"
+    BITRIX_REPO_ROOT="${CLUSTER_ROOT_DIR}"
+    return 0
     fi
 
     if [[ -f "${BITRIX_CLUSTER_CACHE}/lib/bitrix-common.sh" ]]; then
@@ -192,5 +195,6 @@ cluster_prepare_role() {
 
     cluster_ensure_role_sources "${role}" || return 1
     cluster_set_paths_from_root "${BITRIX_CLUSTER_CACHE}"
+    BITRIX_REPO_ROOT="${CLUSTER_ROOT_DIR}"
 #
 }

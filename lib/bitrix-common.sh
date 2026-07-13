@@ -49,6 +49,8 @@ DEFAULT_SITE=/home/bitrix/www
 CONFIGURE_IPTABLES=0
 CONFIGURE_FIREWALLD=1
 MYSQL_VERSION="8.0"
+BITRIX_PHP_HANDLER="${BITRIX_PHP_HANDLER:-fpm}"
+PHP_FPM_SOCKET="${PHP_FPM_SOCKET:-/run/php-fpm/www.sock}"
 [[ -z ${SILENT} ]] && SILENT=0
 [[ -z ${TEST_REPOSITORY} ]] && TEST_REPOSITORY=0
 BX_PACKAGE="bitrix-env"
@@ -401,6 +403,8 @@ MBEPG12="You can find PostgreSQL password settings in config file: $PGSQL_PASS."
 MBE0107="CRB repository has been configured successfully."
 MBE0108="Installing $BX_CATDOC_PACKAGE package. Please wait."
 MBE0109="Installing httpd packages. Please wait."
+MBE0114="Configuring PHP-FPM for Bitrix. Please wait."
+MBE0115="Nginx switched to PHP-FPM backend."
 #
 MBE0110="Wait for pool create task take cycles: "
 MBE0111="Wait for run push server task take cycles: "
@@ -855,18 +859,124 @@ configure_php() {
     PHP_VERSION=8.2
     print "$MBE0076" 1
     dnf module install php:remi-${PHP_VERSION} -y >> ${LOGS_FILE} 2>&1
-    dnf -y install php php-mysqli php-pgsql php-pecl-apcu php-pecl-zendopcache php-pecl-redis6 php-pecl-msgpack php-pecl-igbinary >> ${LOGS_FILE} 2>&1 || print_e "$MBE0079 php-packages"
-    # remove fpm because install as depends
+    local php_packages="php php-mysqli php-pgsql php-pecl-apcu php-pecl-zendopcache php-pecl-redis6 php-pecl-msgpack php-pecl-igbinary"
+    if [[ "${BITRIX_PHP_HANDLER}" == "fpm" ]]; then
+        php_packages+=" php-fpm"
+    fi
+    dnf -y install ${php_packages} >> ${LOGS_FILE} 2>&1 || print_e "$MBE0079 php-packages"
+    if [[ "${BITRIX_PHP_HANDLER}" == "fpm" ]]; then
+        return 0
+    fi
     systemctl stop php-fpm.service >> ${LOGS_FILE} 2>&1
     systemctl disable php-fpm.service >> ${LOGS_FILE} 2>&1
     dnf remove -y php-fpm >> ${LOGS_FILE} 2>&1
 #
 }
 
+configure_php_fpm_pool() {
+#
+    [[ "${BITRIX_PHP_HANDLER}" == "fpm" ]] || return 0
+    print "$MBE0114" 1
+    local pool_conf=/etc/php-fpm.d/www.conf
+    local sock="${PHP_FPM_SOCKET}"
+    local run_user=bitrix
+    local run_group=bitrix
+    id bitrix >> ${LOGS_FILE} 2>&1 || { run_user=apache; run_group=apache; }
+
+    if [[ -f "${pool_conf}" ]]; then
+        sed -i "s/^user = .*/user = ${run_user}/" "${pool_conf}"
+        sed -i "s/^group = .*/group = ${run_group}/" "${pool_conf}"
+        sed -i "s|^listen = .*|listen = ${sock}|" "${pool_conf}"
+        sed -i 's/^;listen.owner = nobody/listen.owner = nginx/' "${pool_conf}"
+        sed -i 's/^;listen.group = nobody/listen.group = nginx/' "${pool_conf}"
+        sed -i 's/^;listen.mode = 0660/listen.mode = 0660/' "${pool_conf}"
+        grep -q '^listen.owner' "${pool_conf}" || echo 'listen.owner = nginx' >> "${pool_conf}"
+        grep -q '^listen.group' "${pool_conf}" || echo 'listen.group = nginx' >> "${pool_conf}"
+        grep -q '^listen.mode' "${pool_conf}" || echo 'listen.mode = 0660' >> "${pool_conf}"
+    fi
+
+    systemctl enable php-fpm >> ${LOGS_FILE} 2>&1
+    systemctl restart php-fpm >> ${LOGS_FILE} 2>&1
+#
+}
+
 configure_httpd() {
 #
+    [[ "${BITRIX_PHP_HANDLER}" == "fpm" ]] && return 0
     print "$MBE0109" 1
     dnf -y install httpd httpd-core httpd-devel httpd-filesystem httpd-tools >> ${LOGS_FILE} 2>&1 || print_e "$MBE0079 httpd-packages"
+#
+}
+
+bitrix_disable_httpd() {
+#
+    [[ "${BITRIX_PHP_HANDLER}" == "fpm" ]] || return 0
+    systemctl disable --now httpd >> ${LOGS_FILE} 2>&1 || true
+#
+}
+
+bitrix_render_php_fpm_nginx_inc() {
+#
+    local template="${1}"
+    local destination="${2}"
+    local content
+    [[ -f "${template}" ]] || return 1
+    content=$(cat "${template}")
+    content=${content//@PHP_FPM_SOCKET@/${PHP_FPM_SOCKET}}
+    printf '%s\n' "${content}" > "${destination}"
+#
+}
+
+configure_bitrix_nginx_php_fpm() {
+#
+    [[ "${BITRIX_PHP_HANDLER}" == "fpm" ]] || return 0
+    local inc="/etc/nginx/bx/conf/bitrix_php_fpm.inc"
+    local tpl=""
+    local site_conf
+
+    configure_php_fpm_pool
+
+    if [[ -n "${CLUSTER_TEMPLATES_DIR:-}" && -f "${CLUSTER_TEMPLATES_DIR}/nginx-bitrix-php-fpm.inc.tpl" ]]; then
+        tpl="${CLUSTER_TEMPLATES_DIR}/nginx-bitrix-php-fpm.inc.tpl"
+    elif [[ -f "${BITRIX_REPO_ROOT:-}/cluster/templates/nginx-bitrix-php-fpm.inc.tpl" ]]; then
+        tpl="${BITRIX_REPO_ROOT}/cluster/templates/nginx-bitrix-php-fpm.inc.tpl"
+    fi
+
+    mkdir -p /etc/nginx/bx/conf
+    if [[ -n "${tpl}" ]]; then
+        bitrix_render_php_fpm_nginx_inc "${tpl}" "${inc}"
+    else
+        print_e "PHP-FPM nginx template not found"
+        return 1
+    fi
+
+    for site_conf in /etc/nginx/bx/site_enabled/*.conf /etc/nginx/bx/site_ext_enabled/*.conf; do
+        [[ -f "${site_conf}" ]] || continue
+        if ! grep -q 'bitrix_php_fpm.inc' "${site_conf}"; then
+            sed -i '/server_name/a \    include /etc/nginx/bx/conf/bitrix_php_fpm.inc;' "${site_conf}"
+        fi
+        sed -i 's|^\(\s*\)proxy_pass\s\+http://127.0.0.1:8080|\1# php-fpm: proxy_pass http://127.0.0.1:8080|' "${site_conf}"
+        sed -i 's|^\(\s*\)proxy_pass\s\+http://127.0.0.1:$server_port|\1# php-fpm: proxy_pass http://127.0.0.1:$server_port|' "${site_conf}"
+        if ! grep -q 'try_files $uri $uri/ @bitrix_php_fpm' "${site_conf}"; then
+            sed -i 's|location / {|location / {\n        try_files $uri $uri/ @bitrix_php_fpm;|' "${site_conf}"
+        fi
+    done
+
+    nginx -t >> ${LOGS_FILE} 2>&1 && systemctl reload nginx >> ${LOGS_FILE} 2>&1
+    bitrix_disable_httpd
+    print "$MBE0115" 1
+#
+}
+
+bitrix_enable_web_services() {
+#
+    if [[ "${BITRIX_PHP_HANDLER}" == "fpm" ]]; then
+        systemctl enable php-fpm nginx >> ${LOGS_FILE} 2>&1
+        systemctl restart php-fpm nginx >> ${LOGS_FILE} 2>&1
+    else
+        systemctl enable httpd nginx >> ${LOGS_FILE} 2>&1
+        systemctl restart httpd nginx >> ${LOGS_FILE} 2>&1
+    fi
 #
 }
 

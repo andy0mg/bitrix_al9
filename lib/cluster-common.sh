@@ -116,6 +116,7 @@ cluster_parse_common_opts() {
 cluster_init() {
 #
     cluster_resolve_paths
+    BITRIX_REPO_ROOT="${CLUSTER_ROOT_DIR}"
     # shellcheck disable=SC1091
     source "${LIB_DIR}/bitrix-common.sh"
     bitrix_init_defaults
