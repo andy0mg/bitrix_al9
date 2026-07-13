@@ -252,6 +252,8 @@ env BITRIX_CLUSTER_REPO=https://github.com/andy0mg/bitrix_al9.git \
 
 Хосты (`MYSQL_MASTER`, `WS_HOST`, `OPENSEARCH_HOST` и др.) по умолчанию подставляются с IP этой VM.
 
+Подробная пошаговая инструкция с командами `dnf install`: [`cluster/FULL-NODE-INSTALL.md`](cluster/FULL-NODE-INSTALL.md).
+
 ### Классический скрипт `bitrix-env-9.sh`
 
 Для установки всех компонентов на одну машину (как в оригинальном BitrixEnv):
