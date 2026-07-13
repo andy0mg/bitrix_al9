@@ -16,7 +16,7 @@ usage() {
 Usage: run.sh [-r git_repo] [-b branch] [-c cluster.env] <role> [install options]
 
 Roles:
-  balancer, app, push, mysql-master, mysql-slave, opensearch
+  balancer, app, push, mysql-master, mysql-slave, opensearch, full-node
 
 Environment:
   BITRIX_CLUSTER_REPO   Git repository URL (recommended)
@@ -27,6 +27,7 @@ Environment:
 Examples:
   ./cluster/run.sh -c /etc/bitrix-cluster.env app -s -H app1 --with-transformer
   ./cluster/run.sh -r https://github.com/you/bitrix_al9.git mysql-master -s -M 'secret'
+  ./cluster/run.sh -c /etc/bitrix-cluster.env full-node -s -H server1 -M 'secret' --with-transformer
 EOF
     exit "${1:-0}"
 }

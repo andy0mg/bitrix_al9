@@ -58,6 +58,24 @@ cluster_render_template() {
 #
 }
 
+cluster_apply_full_node_defaults() {
+#
+    local local_ip
+    local_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    [[ -n "${local_ip}" ]] || local_ip=127.0.0.1
+
+    MYSQL_MASTER=${MYSQL_MASTER:-${local_ip}}
+    MASTER_HOST=${MASTER_HOST:-${local_ip}}
+    PUSH_HOST=${PUSH_HOST:-${local_ip}}
+    WS_HOST=${WS_HOST:-${local_ip}}
+    OPENSEARCH_HOST=${OPENSEARCH_HOST:-${local_ip}}
+    OPENSEARCH_BIND_HOST=${OPENSEARCH_BIND_HOST:-${local_ip}}
+    MEMCACHED_BIND=${MEMCACHED_BIND:-127.0.0.1}
+    APP_SERVERS=${APP_SERVERS:-${local_ip}:8080}
+    TRANSFORMER_ENABLED=${TRANSFORMER_ENABLED:-1}
+#
+}
+
 cluster_build_upstream_block() {
 #
     APP_SERVERS_BLOCK=""

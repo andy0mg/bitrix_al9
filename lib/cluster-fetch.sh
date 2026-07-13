@@ -51,6 +51,12 @@ cluster/cluster.env.example
                 cluster/install-opensearch.sh \
                 cluster/templates/opensearch.yml.tpl
             ;;
+        full-node)
+            printf '%s\n' ${common} \
+                cluster/install-full-node.sh \
+                cluster/templates/opensearch.yml.tpl \
+                cluster/templates/transformer/transformer.env.tpl
+            ;;
         *)
             echo "Unknown role: ${role}" >&2
             return 1
