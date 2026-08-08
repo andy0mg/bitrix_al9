@@ -52,6 +52,11 @@ cluster/cluster.env.example
                 cluster/install-opensearch.sh \
                 cluster/templates/opensearch.yml.tpl
             ;;
+        transformer)
+            printf '%s\n' ${common} \
+                cluster/install-transformer.sh \
+                cluster/templates/transformer/transformer.env.tpl
+            ;;
         full-node)
             printf '%s\n' ${common} \
                 cluster/install-full-node.sh \
