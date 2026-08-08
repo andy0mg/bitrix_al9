@@ -39,6 +39,7 @@
 | MySQL master | `cluster/install-mysql-master.sh` | Percona Server 8.0/8.4, GTID, replication user |
 | MySQL slave | `cluster/install-mysql-slave.sh` | Percona Server, репликация с master |
 | OpenSearch | `cluster/install-opensearch.sh` | OpenSearch 2.x, single-node |
+| Transformer | `cluster/install-transformer.sh` | RabbitMQ, LibreOffice, ffmpeg (Enterprise, одна нода) |
 | Full node | `cluster/install-full-node.sh` | Все компоненты на одной VM (альтернатива `bitrix-env-9.sh`) |
 
 ## Требования
@@ -65,6 +66,7 @@ lib/
   install-mysql-master.sh
   install-mysql-slave.sh
   install-opensearch.sh
+  install-transformer.sh
   install-full-node.sh
   templates/                 # Шаблоны nginx, keepalived, MySQL, OpenSearch, transformer
 ```
@@ -120,6 +122,7 @@ env BITRIX_CLUSTER_REPO=https://github.com/andy0mg/bitrix_al9.git \
 | `mysql-master` | lib/*, install-mysql-master.sh, replication.cnf |
 | `mysql-slave` | lib/*, install-mysql-slave.sh, replication.cnf |
 | `opensearch` | lib/*, install-opensearch.sh, opensearch.yml.tpl |
+| `transformer` | lib/*, install-transformer.sh, transformer.env.tpl |
 | `full-node` | lib/*, install-full-node.sh, opensearch.yml.tpl, transformer.env.tpl |
 
 ### Вариант B: локальная копия репозитория
@@ -177,18 +180,26 @@ vi cluster/cluster.env
 
 После установки скопируйте `SECURITY_KEY` из `/etc/sysconfig/push-server-multi` — он понадобится в модуле Push&Pull.
 
-### 5. Серверы приложений
+### 5. Transformer (отдельная VM или одна app-нода)
 
-На **первой** app-ноде (с transformer):
+На **отдельной** VM:
+
+```bash
+./cluster/run.sh -r "${BITRIX_CLUSTER_REPO}" transformer -s -c /etc/bitrix-cluster.env -H transformer1
+```
+
+Либо на **первой** app-ноде через флаг `--with-transformer` (см. ниже). Transformer ставится только на **одной** ноде (ограничение Bitrix). Параметры RabbitMQ — в `/etc/bitrix-transformer.env`.
+
+### 6. Серверы приложений
+
+На **первой** app-ноде (если transformer не вынесен отдельно):
 
 ```bash
 ./cluster/run.sh -r "${BITRIX_CLUSTER_REPO}" app -s -c /etc/bitrix-cluster.env -H app1 --with-transformer
 ./cluster/run.sh -r "${BITRIX_CLUSTER_REPO}" app -s -c /etc/bitrix-cluster.env -H app2
 ```
 
-> Transformer можно установить только на **одной** ноде (ограничение Bitrix). Параметры RabbitMQ сохраняются в `/etc/bitrix-transformer.env`.
-
-### 6. Балансировщики
+### 7. Балансировщики
 
 На **lb1** (MASTER) — в `cluster.env` или через переменные окружения:
 
