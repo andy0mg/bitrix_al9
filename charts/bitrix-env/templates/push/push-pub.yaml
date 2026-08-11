@@ -1,0 +1,63 @@
+{{- if include "bitrix.pushEnabled" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+  name: {{ printf "%s-push-pub" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.push.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ printf "%s-push-pub" (include "bitrix.fullname" .) }}
+      {{- include "bitrix.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ printf "%s-push-pub" (include "bitrix.fullname" .) }}
+        {{- include "bitrix.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "chart.scheduling" (dict "values" .Values.pushSchedulling "context" .) | nindent 6 }}
+      containers:
+      - name: push-pub
+        {{- $push := .Values.push }}
+        image: {{ $push.registry }}/{{ $push.repository }}:{{ $push.tag }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        env:
+        - name: PUSH_PUB_MODE
+          value: pub
+        - name: PUSH_PUB_PORT
+          value: "9010"
+        resources:
+          {{- toYaml $push.resources | nindent 10 }}  
+        ports:
+        - containerPort: 9010
+          protocol: TCP  
+        volumeMounts:
+        - name: push-pub
+          mountPath: /etc/push-server/push-server-pub.json
+          subPath: push-server-pub.json
+      volumes:
+      - name: push-pub
+        secret:
+          secretName: {{ printf "%s-push-server-pub.json" (include "bitrix.fullname" .) }}
+          
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-push-pub" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  ports:
+  - port: 9010
+    protocol: TCP
+    targetPort: 9010
+  selector:
+    app: {{ printf "%s-push-pub" (include "bitrix.fullname" .) }}
+    {{- include "bitrix.selectorLabels" . | nindent 4 }}
+  type: ClusterIP
+  {{- end }}

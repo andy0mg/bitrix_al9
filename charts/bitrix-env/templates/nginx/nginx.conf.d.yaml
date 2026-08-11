@@ -1,0 +1,164 @@
+apiVersion: v1
+data:
+  default.conf: |
+    server {
+      listen 8080 default_server;
+
+      access_log off;
+      
+      allow 127.0.0.1;
+      allow 10.0.0.0/8;
+      allow 172.16.0.0/12;
+      allow 192.168.0.0/16;  
+      deny all;
+      
+      location /stub_status {
+        stub_status on;
+      }
+      
+      location = /status {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param SCRIPT_NAME /status;
+        fastcgi_param PATH_INFO /status;
+        fastcgi_pass 127.0.0.1:9000;
+      }  
+    }
+
+    server {
+      listen 80;
+      server_name _;
+
+      root /home/bitrix/www;
+      index index.php;
+
+      {{- if (include "bitrix.pushEnabled" .) }}
+      include /etc/nginx/inc/push.conf;
+      {{- end }}
+      
+      location / {
+        return 301 https://$host$request_uri;
+      }
+    }
+    
+    server {
+      listen 443 ssl;
+      server_name _;
+
+      include /etc/nginx/inc/ssl.conf;
+
+      real_ip_header X-Real-IP;
+      ###set_real_ip_from %REAL_IP_FROM%;
+
+      access_log /proc/self/fd/1;
+      error_log /proc/self/fd/2;
+
+      root /home/bitrix/www;
+      index index.php bitrixsetup.php restore.php;
+
+      error_page 404 @bitrix;
+
+      error_page 500 502 503 504 /500.html;
+      location = /500.html {
+          root /home/bitrix/www;
+      }
+
+      include /etc/nginx/inc/intranet.conf; 
+      include /etc/nginx/inc/block.conf;
+      include /etc/nginx/inc/static.conf;
+      include /etc/nginx/inc/bx_temp.conf;
+      #include /etc/nginx/inc/composite.conf;
+      include /etc/nginx/inc/clouds.conf;
+      include /etc/nginx/inc/proxy.conf;
+      include /etc/nginx/inc/dav.conf;
+
+      {{- if (include "bitrix.pushEnabled" .) }}
+      include /etc/nginx/inc/push.conf;
+      {{- end }}
+       
+
+      location = / {
+        if (-f $document_root/bitrixsetup.php) {
+            return 302 /bitrixsetup.php;
+        }
+        if (-f $document_root/restore.php) {
+            return 302 /restore.php;
+        }
+      }
+
+      location / {
+        index index.php;
+        try_files $uri $uri/ @bitrix;
+      }
+
+      location = /status {
+        allow 127.0.0.1;
+        deny all;
+        access_log off;
+        include fastcgi_params;
+        fastcgi_pass 127.0.0.1:9000;
+      }
+
+      location ~ \.php$ {
+        try_files $uri @bitrix;
+        include fastcgi_params;
+        fastcgi_split_path_info ^(.+\.php)(.*)$;
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+      }
+     
+      location @bitrix {
+        include fastcgi_params;
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root/bitrix/urlrewrite.php;
+        #fastcgi_param SCRIPT_FILENAME $document_root/bitrix/routing_index.php;
+      }   
+    }
+    
+    server {
+      listen 8893;
+      server_name _;
+
+      real_ip_header X-Real-IP;
+      ###set_real_ip_from %REAL_IP_FROM%;
+
+      #charset utf-8;
+      access_log /proc/self/fd/1;
+      error_log /proc/self/fd/2;
+
+      include /etc/nginx/inc/errors.conf;
+      include /etc/nginx/inc/block.conf;
+      {{- if (include "bitrix.pushEnabled" .) }}
+      include /etc/nginx/inc/push.conf;
+      {{- end }}
+    }
+  
+    server {
+      listen 8894 ssl;
+      server_name _;
+
+      include /etc/nginx/inc/ssl.conf;
+
+      real_ip_header X-Real-IP;
+      ###set_real_ip_from %REAL_IP_FROM%;
+
+      include /etc/nginx/inc/errors.conf;
+      include /etc/nginx/inc/block.conf;
+      {{- if (include "bitrix.pushEnabled" .) }}
+      include /etc/nginx/inc/push.conf; 
+      {{- end }}
+
+      location / {
+        index index.html;
+        root /home/bitrix/www;
+      }
+    }         
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-nginx.conf.d" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}

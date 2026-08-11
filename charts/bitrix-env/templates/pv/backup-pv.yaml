@@ -1,0 +1,34 @@
+{{- if include "bitrix.isAdmin" . }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ printf "%s-backup-pv" (include "bitrix.fullname" .) }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  storageClassName: {{ .Values.s3.storageClassName }}
+  persistentVolumeReclaimPolicy: Retain
+  capacity:
+    storage: {{ .Values.s3.backup.capacity }}
+  accessModes:
+    - ReadWriteMany
+  claimRef:
+    name: {{ printf "%s-backup-pvc" (include "bitrix.fullname" .) }}
+    namespace: {{ .Release.Namespace }}
+  csi:
+    driver: ru.yandex.s3.csi
+    volumeHandle: {{ .Values.s3.bucket }}//backup
+    controllerPublishSecretRef:
+      name: {{ printf "%s-csi-s3" (include "bitrix.fullname" .) }}
+      namespace: {{ .Release.Namespace }}
+    nodePublishSecretRef:
+      name: {{ printf "%s-csi-s3" (include "bitrix.fullname" .) }}
+      namespace: {{ .Release.Namespace }}
+    nodeStageSecretRef:
+      name: {{ printf "%s-csi-s3" (include "bitrix.fullname" .) }}
+      namespace: {{ .Release.Namespace }}
+    volumeAttributes:
+      capacity: {{ .Values.s3.backup.capacity }}
+      mounter: geesefs
+      options: "--no-checksum --memory-limit 4000 --max-flushers 32 --max-parallel-parts 32 --part-sizes 25 --dir-mode=0755 --file-mode=0644 --uid=1000 --gid=1000"
+{{- end}}

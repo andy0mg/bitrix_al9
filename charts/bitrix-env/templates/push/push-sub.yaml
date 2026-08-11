@@ -1,0 +1,63 @@
+{{- if include "bitrix.pushEnabled" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+  name: {{ printf "%s-push-sub" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.push.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ printf "%s-push-sub" (include "bitrix.fullname" .) }}
+      {{- include "bitrix.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ printf "%s-push-sub" (include "bitrix.fullname" .) }}
+        {{- include "bitrix.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "chart.scheduling" (dict "values" .Values.pushSchedulling "context" .) | nindent 6 }}
+      containers:
+      - name: push-sub
+        {{- $push := .Values.push }}
+        image: {{ $push.registry }}/{{ $push.repository }}:{{ $push.tag }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        env:
+        - name: PUSH_SUB_MODE
+          value: sub
+        - name: PUSH_SUB_PORT
+          value: "8010"
+        resources:
+          {{- toYaml $push.resources | nindent 10 }}  
+        ports:
+        - containerPort: 8010
+          protocol: TCP   
+        volumeMounts:
+        - name: push-sub
+          mountPath: /etc/push-server/push-server-sub.json
+          subPath: push-server-sub.json    
+      volumes:
+      - name: push-sub
+        secret:
+          secretName: {{ printf "%s-push-server-sub.json" (include "bitrix.fullname" .) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-push-sub" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  ports:
+  - port: 8010
+    protocol: TCP
+    targetPort: 8010
+  selector:
+    app: {{ printf "%s-push-sub" (include "bitrix.fullname" .) }}
+    {{- include "bitrix.selectorLabels" . | nindent 4 }}
+  type: ClusterIP
+{{- end }}
+

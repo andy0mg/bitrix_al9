@@ -1,0 +1,17 @@
+apiVersion: v1
+data:
+  composite.conf: |
+    #
+    location ~* @.*\.html$ {
+        internal;
+        # disable browser cache, php manage file
+        expires -1y;
+        add_header X-Bitrix-Composite "Nginx (file)";
+    }
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-composite.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}

@@ -1,0 +1,26 @@
+apiVersion: v1
+data:
+  dav.conf: |
+    #
+    location ~ ^/bitrix/groupdav.php.*$ {
+        if ($request_method ~ ^(PROPPATCH|MKCALENDAR)$) {
+        add_header Allow "OPTIONS,REPORT,CHECKAUTH,PROPFIND,MKCOL,GET,POST,PUT,DELETE,COPY,MOVE,LOCK,UNLOCK,ACL,HEAD";
+        return 405 "Method not allowed";
+        }
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root/bitrix/groupdav.php;
+        fastcgi_split_path_info ^(.+\.php)(.*)$;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+    #
+    location ~ ^/.well-known/(caldav|carddav)$ {
+        rewrite ^ /bitrix/groupdav.php last;
+    }
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-dav.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
