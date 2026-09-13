@@ -105,7 +105,11 @@ MEMCACHED_BIND=${MEMCACHED_BIND:-0.0.0.0}
 print "Installing memcached. Please wait." 1
 dnf module enable memcached:remi -y >> ${LOGS_FILE} 2>&1
 dnf -y install memcached >> ${LOGS_FILE} 2>&1 || print_e "$MBE0079 memcached"
-if [[ -f /etc/sysconfig/memcached ]]; then
+if command -v cluster_render_template >> /dev/null 2>&1 \
+    && [[ -n "${CLUSTER_TEMPLATES_DIR:-}" && -f "${CLUSTER_TEMPLATES_DIR}/memcached.tpl" && -f /etc/sysconfig/memcached ]]; then
+    cp -a /etc/sysconfig/memcached /etc/sysconfig/memcached.bak 2>/dev/null || true
+    cluster_render_template "${CLUSTER_TEMPLATES_DIR}/memcached.tpl" /etc/sysconfig/memcached
+elif [[ -f /etc/sysconfig/memcached ]]; then
     sed -i "s/^PORT=.*/PORT=${MEMCACHED_PORT}/" /etc/sysconfig/memcached
     sed -i "s/^OPTIONS=.*/OPTIONS=\"-l ${MEMCACHED_BIND}\"/" /etc/sysconfig/memcached
 fi
@@ -826,12 +830,33 @@ configure_redis() {
     if [[ ${REDIS} -gt 0 ]];
     then
         print "$MBE0105" 1
-        return 0
+    else
+        dnf module enable redis:remi-${REDIS_VERSION} -y >> ${LOGS_FILE} 2>&1
+        dnf -y install redis >> ${LOGS_FILE} 2>&1 || print_e "$MBE0079 redis"
+        print "$MBE0103" 1
     fi
+    bitrix_apply_redis_config
+#
+}
 
-    dnf module enable redis:remi-${REDIS_VERSION} -y >> ${LOGS_FILE} 2>&1
-    dnf -y install redis >> ${LOGS_FILE} 2>&1 || print_e "$MBE0079 redis"
-    print "$MBE0103" 1
+bitrix_apply_redis_config() {
+#
+    command -v cluster_render_template >> /dev/null 2>&1 || return 0
+    [[ -n "${CLUSTER_TEMPLATES_DIR:-}" && -f "${CLUSTER_TEMPLATES_DIR}/redis-bitrix.conf.tpl" ]] || return 0
+
+    local main_conf=""
+    local candidate
+    for candidate in /etc/redis/redis.conf /etc/redis.conf; do
+        [[ -f "${candidate}" ]] && { main_conf="${candidate}"; break; }
+    done
+    [[ -n "${main_conf}" ]] || return 0
+
+    local dropin="$(dirname "${main_conf}")/redis-bitrix.conf"
+    cluster_render_template "${CLUSTER_TEMPLATES_DIR}/redis-bitrix.conf.tpl" "${dropin}"
+    chown redis:redis "${dropin}" >> ${LOGS_FILE} 2>&1 || true
+    chmod 640 "${dropin}" >> ${LOGS_FILE} 2>&1 || true
+    grep -q "^include ${dropin}\$" "${main_conf}" || echo "include ${dropin}" >> "${main_conf}"
+    print "Redis tuning applied: ${dropin}" 1
 #
 }
 
@@ -879,19 +904,31 @@ configure_php_fpm_pool() {
     print "$MBE0114" 1
     local pool_conf=/etc/php-fpm.d/www.conf
     local sock="${PHP_FPM_SOCKET}"
-    local run_user=bitrix
-    local run_group=bitrix
-    id bitrix >> ${LOGS_FILE} 2>&1 || { run_user=apache; run_group=apache; }
+    PHP_FPM_USER=bitrix
+    PHP_FPM_GROUP=bitrix
+    id bitrix >> ${LOGS_FILE} 2>&1 || { PHP_FPM_USER=apache; PHP_FPM_GROUP=apache; }
+    PHP_FPM_LISTEN_OWNER=${PHP_FPM_LISTEN_OWNER:-nginx}
+    PHP_FPM_LISTEN_GROUP=${PHP_FPM_LISTEN_GROUP:-nginx}
 
-    if [[ -f "${pool_conf}" ]]; then
-        sed -i "s/^user = .*/user = ${run_user}/" "${pool_conf}"
-        sed -i "s/^group = .*/group = ${run_group}/" "${pool_conf}"
+    local tpl=""
+    if [[ -n "${CLUSTER_TEMPLATES_DIR:-}" && -f "${CLUSTER_TEMPLATES_DIR}/php-fpm-www.conf.tpl" ]]; then
+        tpl="${CLUSTER_TEMPLATES_DIR}/php-fpm-www.conf.tpl"
+    elif [[ -f "${BITRIX_REPO_ROOT:-}/cluster/templates/php-fpm-www.conf.tpl" ]]; then
+        tpl="${BITRIX_REPO_ROOT}/cluster/templates/php-fpm-www.conf.tpl"
+    fi
+
+    if [[ -n "${tpl}" ]] && command -v cluster_render_template >> /dev/null 2>&1; then
+        [[ -f "${pool_conf}" ]] && cp -a "${pool_conf}" "${pool_conf}.bak" 2>/dev/null
+        cluster_render_template "${tpl}" "${pool_conf}"
+    elif [[ -f "${pool_conf}" ]]; then
+        sed -i "s/^user = .*/user = ${PHP_FPM_USER}/" "${pool_conf}"
+        sed -i "s/^group = .*/group = ${PHP_FPM_GROUP}/" "${pool_conf}"
         sed -i "s|^listen = .*|listen = ${sock}|" "${pool_conf}"
-        sed -i 's/^;listen.owner = nobody/listen.owner = nginx/' "${pool_conf}"
-        sed -i 's/^;listen.group = nobody/listen.group = nginx/' "${pool_conf}"
+        sed -i "s/^;listen.owner = nobody/listen.owner = ${PHP_FPM_LISTEN_OWNER}/" "${pool_conf}"
+        sed -i "s/^;listen.group = nobody/listen.group = ${PHP_FPM_LISTEN_GROUP}/" "${pool_conf}"
         sed -i 's/^;listen.mode = 0660/listen.mode = 0660/' "${pool_conf}"
-        grep -q '^listen.owner' "${pool_conf}" || echo 'listen.owner = nginx' >> "${pool_conf}"
-        grep -q '^listen.group' "${pool_conf}" || echo 'listen.group = nginx' >> "${pool_conf}"
+        grep -q '^listen.owner' "${pool_conf}" || echo "listen.owner = ${PHP_FPM_LISTEN_OWNER}" >> "${pool_conf}"
+        grep -q '^listen.group' "${pool_conf}" || echo "listen.group = ${PHP_FPM_LISTEN_GROUP}" >> "${pool_conf}"
         grep -q '^listen.mode' "${pool_conf}" || echo 'listen.mode = 0660' >> "${pool_conf}"
     fi
 

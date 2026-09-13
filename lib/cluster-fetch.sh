@@ -30,12 +30,15 @@ cluster/cluster.env.example
             printf '%s\n' ${common} \
                 cluster/install-app.sh \
                 cluster/templates/transformer/transformer.env.tpl \
-                cluster/templates/nginx-bitrix-php-fpm.inc.tpl
+                cluster/templates/nginx-bitrix-php-fpm.inc.tpl \
+                cluster/templates/php-fpm-www.conf.tpl \
+                cluster/templates/memcached.tpl
             ;;
         push)
             printf '%s\n' ${common} \
                 cluster/install-push.sh \
-                cluster/templates/push-server-multi.tpl
+                cluster/templates/push-server-multi.tpl \
+                cluster/templates/redis-bitrix.conf.tpl
             ;;
         mysql-master)
             printf '%s\n' ${common} \
@@ -57,7 +60,10 @@ cluster/cluster.env.example
                 cluster/install-full-node.sh \
                 cluster/templates/opensearch.yml.tpl \
                 cluster/templates/transformer/transformer.env.tpl \
-                cluster/templates/nginx-bitrix-php-fpm.inc.tpl
+                cluster/templates/nginx-bitrix-php-fpm.inc.tpl \
+                cluster/templates/php-fpm-www.conf.tpl \
+                cluster/templates/memcached.tpl \
+                cluster/templates/redis-bitrix.conf.tpl
             ;;
         *)
             echo "Unknown role: ${role}" >&2

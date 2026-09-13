@@ -115,12 +115,12 @@ env BITRIX_CLUSTER_REPO=https://github.com/andy0mg/bitrix_al9.git \
 | Роль | Файлы |
 |------|--------|
 | `balancer` | lib/*, install-balancer.sh, шаблоны nginx/keepalived |
-| `app` | lib/*, install-app.sh, transformer.env.tpl |
-| `push` | lib/*, install-push.sh |
+| `app` | lib/*, install-app.sh, transformer.env.tpl, nginx-bitrix-php-fpm.inc.tpl, php-fpm-www.conf.tpl, memcached.tpl |
+| `push` | lib/*, install-push.sh, redis-bitrix.conf.tpl |
 | `mysql-master` | lib/*, install-mysql-master.sh, replication.cnf |
 | `mysql-slave` | lib/*, install-mysql-slave.sh, replication.cnf |
 | `opensearch` | lib/*, install-opensearch.sh, opensearch.yml.tpl |
-| `full-node` | lib/*, install-full-node.sh, opensearch.yml.tpl, transformer.env.tpl |
+| `full-node` | lib/*, install-full-node.sh, opensearch.yml.tpl, transformer.env.tpl, nginx-bitrix-php-fpm.inc.tpl, php-fpm-www.conf.tpl, memcached.tpl, redis-bitrix.conf.tpl |
 
 ### Вариант B: локальная копия репозитория
 
@@ -306,6 +306,10 @@ PHP обрабатывается через **nginx + php-fpm** (по умолч
 | `nginx-upstream.conf.tpl` | Upstream app-серверов |
 | `http_balancer.conf.tpl` | HTTP-балансировщик nginx |
 | `keepalived.conf.tpl` | VRRP + VIP |
+| `nginx-bitrix-php-fpm.inc.tpl` | FastCGI-include nginx → PHP-FPM |
+| `php-fpm-www.conf.tpl` | Пул PHP-FPM (сокет, user, pm.*) |
+| `memcached.tpl` | `/etc/sysconfig/memcached` (порт, bind, лимиты) |
+| `redis-bitrix.conf.tpl` | Тюнинг Redis (bind, maxmemory, политика) |
 | `mysql-master.cnf.d/replication.cnf` | GTID, binlog на master |
 | `mysql-slave.cnf.d/replication.cnf` | read_only на slave |
 | `opensearch.yml.tpl` | single-node OpenSearch |
