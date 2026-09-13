@@ -1,0 +1,83 @@
+{{- if .Values.features.push }}
+  {{- if not .Values.push.key }}
+    {{- fail (printf "\n\nError: Push feature is enabled but push.key is not configured!\n\nPlease provide push.key in your values.yaml:\n  push:\n    key: <your-push-key>\n\nYou can generate a secure key using:\n  docker container run --rm --name push_server_key_generate alpine:3.21 sh -c \"(cat /dev/urandom | tr -dc A-Za-z0-9 | head -c 128) && echo ''\"\n") }}
+  {{- end }}
+{{- end }}
+
+
+
+{{- if (include "bitrix.isAdmin" .) }}
+{{- if .Values.features.git }}
+  {{- $missingFields := list }}
+  {{- if not .Values.git.repoUrl }}
+    {{- $missingFields = append $missingFields "git.repoUrl" }}
+  {{- end }}
+  {{- if not .Values.git.name }}
+    {{- $missingFields = append $missingFields "git.name" }}
+  {{- end }}
+  {{- if not .Values.git.email }}
+    {{- $missingFields = append $missingFields "git.email" }}
+  {{- end }}
+  {{- if not .Values.git.secret }}
+    {{- $missingFields = append $missingFields "git.secret" }}
+  {{- end }}
+  
+  {{- if $missingFields }}
+    {{- fail (printf "\n\nError: Git feature is enabled but required configuration is missing!\n\nMissing fields:\n  - %s\n\nPlease provide all required git configuration in your values.yaml:\n  git:\n    repoUrl: <your-repo-url>\n    branch: <branch-name>\n    name: <git-username>\n    email: <git-email>\n    host: <git-host>\n    secret: <secret-name>\n" (join "\n  - " $missingFields)) }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
+
+
+{{- if and .Values.tls.existingSecret (or .Values.tls.certificate .Values.tls.privateKey) }}
+  {{- fail "TLS configuration error: When using existingSecret, you should not specify certificate or privateKey" }}
+{{- end }}
+
+{{- if and .Values.certmanager.enabled (or .Values.tls.existingSecret .Values.tls.certificate .Values.tls.privateKey) }}
+  {{- fail "TLS configuration error: When certmanager is enabled, you should not specify existingSecret, certificate or privateKey" }}
+{{- end }}
+
+{{- if and (or .Values.tls.certificate .Values.tls.privateKey) (not (and .Values.tls.certificate .Values.tls.privateKey)) }}
+  {{- fail "TLS configuration error: Both certificate and privateKey must be specified together" }}
+{{- end }}
+
+{{- if and (not .Values.certmanager.enabled) (not .Values.tls.existingSecret) (not (and .Values.tls.certificate .Values.tls.privateKey)) }}
+  {{- fail "TLS configuration error: You must either enable certmanager, specify existingSecret, or provide both certificate and privateKey" }}
+{{- end }}
+
+{{- if and .Values.certmanager.enabled (or (not .Values.certmanager.email) (not .Values.certmanager.issuer)) }}
+  {{- fail "TLS configuration error: When certmanager is enabled, you must specify an email address and a certificate publisher" }}
+{{- end }}
+
+{{- if .Values.certmanager.email }}
+  {{- $email := .Values.certmanager.email | trim }}
+  {{- if not $email }}
+    {{- fail "certmanager.email cannot be empty or contain only spaces" }}
+  {{- else if not (regexMatch "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" $email) }}
+    {{- fail (printf "certmanager.email '%s' is not a valid email address" $email) }}
+  {{- end }}
+{{- end }}
+
+
+
+{{- if .Values.push.replicaCount }}
+  {{- if ne (int .Values.push.replicaCount) 1 }}
+    {{- fail (printf "\n\nError: push.replicaCount must be exactly 1!\n\nCurrent value: %v\n\nPlease set in your values.yaml:\n  push:\n    replicaCount: 1\n" .Values.push.replicaCount) }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.sphinx.replicaCount }}
+  {{- if ne (int .Values.sphinx.replicaCount) 1 }}
+    {{- fail (printf "\n\nError: sphinx.replicaCount must be exactly 1!\n\nCurrent value: %v\n\nPlease set in your values.yaml:\n  sphinx:\n    replicaCount: 1\n" .Values.sphinx.replicaCount) }}
+  {{- end }}
+{{- end }}
+
+
+{{- if (include "bitrix.isAdmin" .) }}
+  {{- if .Values.replicaCount }}
+    {{- if ne (int .Values.replicaCount) 1 }}
+      {{- fail (printf "\n\nError: replicaCount must be exactly 1 in admin environment!\n\nCurrent value: %v\n\nPlease set in your values.yaml:\n  replicaCount: 1\n" .Values.replicaCount) }}
+    {{- end }}
+  {{- end }}
+{{- end }}

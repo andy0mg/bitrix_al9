@@ -1,0 +1,94 @@
+{{- if include "bitrix.sphinxEnabled" . }}
+apiVersion: v1
+data:
+  sphinx.conf: |
+    #
+    index bitrix
+    {
+        # Main settings
+        type = rt
+        path = /opt/sphinx/lib/bitrix
+        docinfo = inline
+        # Choose appropriate type of morphology to use
+        #morphology = lemmatize_ru_all, lemmatize_en_all, lemmatize_de_all, stem_enru
+        morphology = stem_enru, soundex
+        # These settings are used by bitrix:search.title component
+        dict = keywords
+        prefix_fields = title
+        infix_fields =
+        min_prefix_len = 2
+        enable_star = 1
+        # All fields must be defined exactly as followed
+        rt_field = title
+        rt_field = body
+        rt_attr_uint = module_id
+        rt_attr_string = module
+        rt_attr_uint = item_id
+        rt_attr_string = item
+        rt_attr_uint = param1_id
+        rt_attr_string = param1
+        rt_attr_uint = param2_id
+        rt_attr_string = param2
+        rt_attr_timestamp = date_change
+        rt_attr_timestamp = date_to
+        rt_attr_timestamp = date_from
+        rt_attr_uint = custom_rank
+        rt_attr_multi = tags
+        rt_attr_multi = right
+        rt_attr_multi = site
+        rt_attr_multi = param
+        # Depends on settings of your site:
+        # for single byte (Windows-1251) use sdcs
+        # for multi byte (UTF-8) use utf-8
+        charset_type = utf-8
+    }
+    #
+    index testrt
+    {
+        type = rt
+        rt_mem_limit = 128M
+        path = /opt/sphinx/lib/testrt
+        rt_field = title
+        rt_field = content
+        rt_attr_uint = gid
+    }
+    #
+    searchd
+    {
+        listen = 9312
+        listen = 9306:mysql41
+        log = /opt/sphinx/log/searchd.log
+        query_log = /opt/sphinx/log/query.log
+        pid_file = /opt/sphinx/run/searchd.pid
+        binlog_path = /opt/sphinx/binlogs
+        read_timeout = 5
+        max_children = 30
+        max_matches = 1000
+        seamless_rotate = 1
+        preopen_indexes = 1
+        unlink_old = 1
+        workers = threads # for RT to work
+        binlog_max_log_size = 512M
+        #  2 - flush every transaction, sync every second. Good performance, and every committed transaction is guaranteed to be saved in case of daemon crash.
+        #  1 - flush and sync every transaction. Worst performance, but every committed transaction data is guaranteed to be saved
+        binlog_flush = 2
+        rt_flush_period = 3600
+    }
+    #
+    indexer
+    {
+        lemmatizer_cache = 128M
+    }
+    #
+    common
+    {
+        lemmatizer_base = /opt/sphinx/dict
+    }
+    #   
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-sphinx.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+{{- end }}

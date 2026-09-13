@@ -1,0 +1,38 @@
+apiVersion: v1
+data:
+  push.conf: |
+    #
+    location ~* ^/bitrix/subws/ {
+        proxy_pass http://{{ printf "%s-push-sub" (include "bitrix.fullname" .) }}:8010;
+        proxy_max_temp_file_size 0;
+        proxy_read_timeout  43800;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $replace_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+    #
+    location ~* ^/bitrix/sub/ {
+        rewrite ^/bitrix/sub/(.*)$ /bitrix/subws/$1 break;
+        proxy_pass http://{{ printf "%s-push-sub" (include "bitrix.fullname" .) }}:8010;
+        proxy_max_temp_file_size 0;
+        proxy_read_timeout  43800;
+    }
+    #
+    location ~* ^/bitrix/rest/ {
+        proxy_pass http://{{ printf "%s-push-pub" (include "bitrix.fullname" .) }}:9010;
+        proxy_max_temp_file_size 0;
+        proxy_read_timeout  43800;
+    }
+    #
+    location ~* ^/bitrix/pub/ {
+        proxy_pass http://{{ printf "%s-push-pub" (include "bitrix.fullname" .) }}:9010;
+        proxy_max_temp_file_size 0;
+        proxy_read_timeout  43800;
+    }
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-push.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}

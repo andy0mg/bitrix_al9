@@ -1,0 +1,15 @@
+apiVersion: v1
+data:
+  resize_cache.conf: |
+    # upload resize cache
+    map $request_uri $resize_cache_encoded_path {
+        ~^/upload/resize_cache/x/(.+)$ /upload/resize_cache/$1;
+        default "";
+    }
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-resize-cache.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}

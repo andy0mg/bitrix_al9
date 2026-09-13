@@ -1,0 +1,37 @@
+name: bitrix-env
+home: ""
+sources: []
+version: 1.0.6
+description: A bitrix-env helm chart for Kubernetes
+keywords:
+    - bitrix-env
+maintainers:
+    - name: Valerii Baev
+      email: ""
+      url: ""
+icon: ""
+apiversion: v2
+condition: ""
+tags: ""
+appversion: 9.0.10
+deprecated: false
+annotations: {}
+kubeversion: '>=1.28.0-0'
+dependencies:
+    - name: redis
+      version: 25.3.9
+      repository: file://charts/redis
+      condition: ""
+      tags: []
+      enabled: false
+      importvalues: []
+      alias: ""
+    - name: common
+      version: 2.37.0
+      repository: file://charts/common
+      condition: ""
+      tags: []
+      enabled: false
+      importvalues: []
+      alias: ""
+type: ""

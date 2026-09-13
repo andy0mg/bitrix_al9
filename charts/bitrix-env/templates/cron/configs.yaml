@@ -1,0 +1,49 @@
+{{- if include "bitrix.cronEnabled" . }}
+apiVersion: v1
+data:
+  root: |-
+    SHELL=/bin/sh
+    CURDATE=`date +%Y-%m-%d`
+    * * * * * bitrix /usr/bin/php -f /home/bitrix/www/bitrix/php_interface/cron_events.php  >> /dev/null 2>&1
+    0 2 * * * bitrix /usr/bin/php -f /home/bitrix//www/bitrix/modules/main/tools/backup.php > /dev/null 2>&1
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-cron" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+
+---
+apiVersion: v1
+data:
+  cron_events.php: |-
+      <?php
+      $_SERVER["DOCUMENT_ROOT"] = realpath(dirname(__FILE__)."/../..");
+      $DOCUMENT_ROOT = $_SERVER["DOCUMENT_ROOT"];
+      define("NO_KEEP_STATISTIC", true);
+      define("NOT_CHECK_PERMISSIONS",true);
+      define('BX_NO_ACCELERATOR_RESET', true);
+      define('CHK_EVENT', true);
+      define('BX_WITH_ON_AFTER_EPILOG', true);
+      require($_SERVER["DOCUMENT_ROOT"]."/bitrix/modules/main/include/prolog_before.php");
+      @set_time_limit(0);
+      @ignore_user_abort(true);
+      CAgent::CheckAgents();
+      define("BX_CRONTAB_SUPPORT", true);
+      define("BX_CRONTAB", true);
+      if(CModule::IncludeModule('sender'))
+      {
+        \Bitrix\Sender\MailingManager::checkPeriod(false);
+        \Bitrix\Sender\MailingManager::checkSend();
+      }
+      require($_SERVER['DOCUMENT_ROOT']."/bitrix/modules/main/tools/backup.php");
+      CMain::FinalActions();
+      ?>
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-cron-events" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+{{- end}}

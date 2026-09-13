@@ -1,0 +1,30 @@
+apiVersion: v1
+data:
+  intranet.conf: |
+    #
+    # personal upload
+    #
+    location ~ ^/company/personal/user/(.+)/photo/photo/(.+)/action/upload/$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root/company/personal.php;
+        fastcgi_split_path_info ^(.+\.php)(.*)$;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+    #
+    # workgroups upload
+    #
+    location ~ ^/workgroups/group/(.+)/photo/photo/(.+)/action/upload/$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root/workgroups/index.php;
+        fastcgi_split_path_info ^(.+\.php)(.*)$;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-intranet.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
