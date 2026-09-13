@@ -54,6 +54,26 @@ cluster_render_template() {
     content=${content//@CLUSTER_NAME@/${OPENSEARCH_CLUSTER_NAME:-bitrix-cluster}}
     content=${content//@NODE_NAME@/${OPENSEARCH_NODE_NAME:-$(hostname -s)}}
     content=${content//@HEAP_SIZE@/${OPENSEARCH_HEAP_SIZE:-1g}}
+    content=${content//@MEMCACHED_PORT@/${MEMCACHED_PORT:-11211}}
+    content=${content//@MEMCACHED_BIND@/${MEMCACHED_BIND:-127.0.0.1}}
+    content=${content//@MEMCACHED_MAXCONN@/${MEMCACHED_MAXCONN:-1024}}
+    content=${content//@MEMCACHED_CACHESIZE@/${MEMCACHED_CACHESIZE:-64}}
+    content=${content//@REDIS_BIND@/${REDIS_BIND:-127.0.0.1}}
+    content=${content//@REDIS_PORT@/${REDIS_PORT:-6379}}
+    content=${content//@REDIS_PROTECTED_MODE@/${REDIS_PROTECTED_MODE:-yes}}
+    content=${content//@REDIS_MAXMEMORY@/${REDIS_MAXMEMORY:-512mb}}
+    content=${content//@REDIS_MAXMEMORY_POLICY@/${REDIS_MAXMEMORY_POLICY:-allkeys-lru}}
+    content=${content//@REDIS_APPENDONLY@/${REDIS_APPENDONLY:-no}}
+    content=${content//@PHP_FPM_SOCKET@/${PHP_FPM_SOCKET:-/run/php-fpm/www.sock}}
+    content=${content//@PHP_FPM_USER@/${PHP_FPM_USER:-bitrix}}
+    content=${content//@PHP_FPM_GROUP@/${PHP_FPM_GROUP:-bitrix}}
+    content=${content//@PHP_FPM_LISTEN_OWNER@/${PHP_FPM_LISTEN_OWNER:-nginx}}
+    content=${content//@PHP_FPM_LISTEN_GROUP@/${PHP_FPM_LISTEN_GROUP:-nginx}}
+    content=${content//@PHP_FPM_MAX_CHILDREN@/${PHP_FPM_MAX_CHILDREN:-50}}
+    content=${content//@PHP_FPM_START_SERVERS@/${PHP_FPM_START_SERVERS:-5}}
+    content=${content//@PHP_FPM_MIN_SPARE_SERVERS@/${PHP_FPM_MIN_SPARE_SERVERS:-5}}
+    content=${content//@PHP_FPM_MAX_SPARE_SERVERS@/${PHP_FPM_MAX_SPARE_SERVERS:-15}}
+    content=${content//@PHP_FPM_MAX_REQUESTS@/${PHP_FPM_MAX_REQUESTS:-1000}}
     printf '%s\n' "${content}" > "${destination}"
 #
 }
