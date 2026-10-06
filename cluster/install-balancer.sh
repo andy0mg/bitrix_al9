@@ -23,6 +23,8 @@ configure_bx_nginx
 dnf -y install keepalived >> ${LOGS_FILE} 2>&1
 
 cluster_build_upstream_block
+cluster_ensure_ssl_cert
+mkdir -p /var/www/letsencrypt
 mkdir -p /etc/nginx/bx/site_enabled
 cluster_render_template "${CLUSTER_TEMPLATES_DIR}/nginx-upstream.conf.tpl" /etc/nginx/bx/site_enabled/upstream.conf
 cluster_render_template "${CLUSTER_TEMPLATES_DIR}/http_balancer.conf.tpl" /etc/nginx/bx/site_enabled/http_balancer.conf

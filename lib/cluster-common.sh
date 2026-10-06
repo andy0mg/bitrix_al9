@@ -49,6 +49,10 @@ cluster_render_template() {
     content=${content//@PEER@/${KEEPALIVED_PEER:-}}
     content=${content//@APP_SERVERS_BLOCK@/${APP_SERVERS_BLOCK:-}}
     content=${content//@SERVER_NAME@/${CLUSTER_DOMAIN:-localhost}}
+    content=${content//@PUSH_HOST@/${PUSH_HOST:-127.0.0.1}}
+    content=${content//@SSL_CERT@/${SSL_CERT:-/etc/nginx/ssl/cert.pem}}
+    content=${content//@SSL_KEY@/${SSL_KEY:-/etc/nginx/ssl/cert.key}}
+    content=${content//@REAL_IP_BLOCK@/${REAL_IP_BLOCK:-}}
     content=${content//@DISCOVERY_TYPE@/${OPENSEARCH_DISCOVERY_TYPE:-single-node}}
     content=${content//@NETWORK_HOST@/${OPENSEARCH_BIND_HOST:-0.0.0.0}}
     content=${content//@CLUSTER_NAME@/${OPENSEARCH_CLUSTER_NAME:-bitrix-cluster}}
@@ -107,6 +111,31 @@ cluster_build_upstream_block() {
         [[ "${host}" == "${port}" ]] && port="8080"
         APP_SERVERS_BLOCK+="    server ${host}:${port};"$'\n'
     done
+#
+}
+
+cluster_build_real_ip_block() {
+#
+    REAL_IP_BLOCK=""
+    local IFS=','
+    local ip
+    for ip in ${BALANCER_IPS:-}; do
+        [[ -n "${ip}" ]] && REAL_IP_BLOCK+="set_real_ip_from ${ip};"$'\n'
+    done
+#
+}
+
+cluster_ensure_ssl_cert() {
+#
+    local cert="${SSL_CERT:-/etc/nginx/ssl/cert.pem}"
+    local key="${SSL_KEY:-/etc/nginx/ssl/cert.key}"
+    [[ -f "${cert}" && -f "${key}" ]] && return 0
+    mkdir -p "$(dirname "${cert}")" "$(dirname "${key}")"
+    openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+        -subj "/CN=${CLUSTER_DOMAIN:-localhost}" \
+        -keyout "${key}" -out "${cert}" >> ${LOGS_FILE} 2>&1
+    chmod 600 "${key}"
+    print "Self-signed certificate created: ${cert}. Replace it with a real one." 1
 #
 }
 
