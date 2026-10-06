@@ -32,6 +32,12 @@ install_additional_packages
 configure_memcached
 configure_bitrix_nginx_php_fpm
 
+if [[ -n "${BALANCER_IPS:-}" ]]; then
+    cluster_build_real_ip_block
+    cluster_render_template "${CLUSTER_TEMPLATES_DIR}/nginx-app-forwarded.conf.tpl" /etc/nginx/bx/site_enabled/00-bx-forwarded.conf
+    nginx -t >> ${LOGS_FILE} 2>&1 && systemctl reload nginx >> ${LOGS_FILE} 2>&1
+fi
+
 if [[ ${WITH_TRANSFORMER} -eq 1 ]] || [[ "${TRANSFORMER_ENABLED:-0}" == "1" ]]; then
     configure_transformer
     if [[ -f "${CLUSTER_TEMPLATES_DIR}/transformer/transformer.env.tpl" ]]; then

@@ -115,7 +115,7 @@ env BITRIX_CLUSTER_REPO=https://github.com/andy0mg/bitrix_al9.git \
 | Роль | Файлы |
 |------|--------|
 | `balancer` | lib/*, install-balancer.sh, шаблоны nginx/keepalived |
-| `app` | lib/*, install-app.sh, transformer.env.tpl, nginx-bitrix-php-fpm.inc.tpl, php-fpm-www.conf.tpl, memcached.tpl |
+| `app` | lib/*, install-app.sh, transformer.env.tpl, nginx-app-forwarded.conf.tpl, nginx-bitrix-php-fpm.inc.tpl, php-fpm-www.conf.tpl, memcached.tpl |
 | `push` | lib/*, install-push.sh, redis-bitrix.conf.tpl |
 | `mysql-master` | lib/*, install-mysql-master.sh, replication.cnf |
 | `mysql-slave` | lib/*, install-mysql-slave.sh, replication.cnf |
@@ -189,6 +189,8 @@ vi cluster/cluster.env
 > Transformer можно установить только на **одной** ноде (ограничение Bitrix). Параметры RabbitMQ сохраняются в `/etc/bitrix-transformer.env`.
 
 ### 6. Балансировщики
+
+Балансировщик терминирует TLS (`SSL_CERT` / `SSL_KEY` из `cluster.env`; если файлов нет, создаётся самоподписанный сертификат), проксирует websocket `/bitrix/subws/` и long polling `/bitrix/sub/` на push-сервер (`PUSH_HOST:8010-8015`), всё остальное — на `APP_SERVERS`. Пути публикации `/bitrix/pub/` и `/bitrix/rest/` наружу закрыты (404): app-серверы публикуют напрямую на `PUSH_HOST:9010`. На app-нодах PHP получает `HTTPS=on`, если балансировщик прислал `X-Forwarded-Proto: https`.
 
 На **lb1** (MASTER) — в `cluster.env` или через переменные окружения:
 
@@ -284,7 +286,9 @@ PHP обрабатывается через **nginx + php-fpm** (по умолч
 
 3. **Push&Pull** — в админке: Настройки → Push and Pull:
    - тип сервера: Bitrix Push server 2.0;
-   - URL push-хоста;
+   - путь для публикации (с app-серверов напрямую): `http://PUSH_HOST:9010/bitrix/pub/`;
+   - путь для подписки (websocket через балансировщик): `wss://CLUSTER_DOMAIN/bitrix/subws/`;
+   - путь для подписки (long polling): `https://CLUSTER_DOMAIN/bitrix/sub/`;
    - `SECURITY_KEY` с push-VM.
 
 4. **OpenSearch** — Настройки → Поиск (модуль ≥ 25.0):
@@ -303,8 +307,9 @@ PHP обрабатывается через **nginx + php-fpm** (по умолч
 
 | Шаблон | Назначение |
 |--------|------------|
-| `nginx-upstream.conf.tpl` | Upstream app-серверов |
-| `http_balancer.conf.tpl` | HTTP-балансировщик nginx |
+| `nginx-upstream.conf.tpl` | Upstream app-серверов (`bx_cluster`) и push-сервера (`bx_push_sub`, порты 8010–8015) |
+| `http_balancer.conf.tpl` | Reverse proxy nginx: 80 → 301 на HTTPS, TLS на 443, `/bitrix/subws/` (websocket) и `/bitrix/sub/` на push, остальное на app |
+| `nginx-app-forwarded.conf.tpl` | `set_real_ip_from` для app-нод (`BALANCER_IPS`), реальный IP клиента из `X-Forwarded-For` |
 | `keepalived.conf.tpl` | VRRP + VIP |
 | `nginx-bitrix-php-fpm.inc.tpl` | FastCGI-include nginx → PHP-FPM |
 | `php-fpm-www.conf.tpl` | Пул PHP-FPM (сокет, user, pm.*) |

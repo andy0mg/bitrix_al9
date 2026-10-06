@@ -1,6 +1,12 @@
 # FastCGI backend for Bitrix (php-fpm). Included from site configs when BITRIX_PHP_HANDLER=fpm.
 # Socket: @PHP_FPM_SOCKET@
 
+# TLS terminated on the balancer: pass HTTPS=on to PHP when X-Forwarded-Proto is https
+set $bx_https $https;
+if ($http_x_forwarded_proto = "https") {
+    set $bx_https on;
+}
+
 location ~* ^/upload/.+\.(php|php3|php4|php5|php6|phtml|pl|asp|aspx|cgi|dll|exe|shtm|shtml|fcg|fcgi|fpl|asmx|pht|py|psp|rb|var)$ {
     types {
         text/plain text/plain php php3 php4 php5 php6 phtml pl asp aspx cgi dll exe ico shtm shtml fcg fcgi fpl asmx pht py psp rb var;
@@ -10,6 +16,7 @@ location ~* ^/upload/.+\.(php|php3|php4|php5|php6|phtml|pl|asp|aspx|cgi|dll|exe|
 location ~ \.php$ {
     try_files $uri @bitrix_php_fpm;
     include fastcgi_params;
+    fastcgi_param HTTPS $bx_https if_not_empty;
     fastcgi_pass @PHP_FPM_SOCKET@;
     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     fastcgi_read_timeout 3600;
@@ -19,6 +26,7 @@ location ~ \.php$ {
 
 location @bitrix_php_fpm {
     include fastcgi_params;
+    fastcgi_param HTTPS $bx_https if_not_empty;
     fastcgi_pass @PHP_FPM_SOCKET@;
     fastcgi_param SCRIPT_FILENAME $document_root/bitrix/urlrewrite.php;
     fastcgi_read_timeout 3600;
@@ -27,6 +35,7 @@ location @bitrix_php_fpm {
 location ~* /bitrix/admin.+\.php$ {
     try_files $uri @bitrixadm_php_fpm;
     include fastcgi_params;
+    fastcgi_param HTTPS $bx_https if_not_empty;
     fastcgi_pass @PHP_FPM_SOCKET@;
     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     fastcgi_read_timeout 3600;
@@ -34,6 +43,7 @@ location ~* /bitrix/admin.+\.php$ {
 
 location @bitrixadm_php_fpm {
     include fastcgi_params;
+    fastcgi_param HTTPS $bx_https if_not_empty;
     fastcgi_pass @PHP_FPM_SOCKET@;
     fastcgi_param SCRIPT_FILENAME $document_root/bitrix/admin/404.php;
     fastcgi_read_timeout 3600;
