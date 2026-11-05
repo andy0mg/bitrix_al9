@@ -6,7 +6,21 @@ Apache 2.4 + PHP 8.4 (mod_php, порт 8090) за Nginx, MariaDB, Redis,
 конфиги из официального архива `debian.zip`, загрузка `bitrixsetup.php`.
 Push-сервер не ставится: для «Управления сайтом» он не нужен (по мануалу).
 
-## Запуск
+## Быстрый старт: скрипт [`install.sh`](install.sh)
+
+Скрипт ставит Ansible с нужными коллекциями, скачивает этот каталог в `/opt/bitrix-ansible`
+и создаёт `inventory.ini` для запуска на том же сервере. С `--run` сразу запускает плейбук:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/andy0mg/bitrix_al9/main/debian13/install.sh | bash -s -- --run
+```
+
+Без `--run` только скачивает: поправьте `group_vars/all.yml` и запустите плейбук сами.
+Параметры: `--dir`, `--branch`, а всё после `--` уходит в `ansible-playbook`
+(например `-- -e bitrix_configure_firewall=true`). Повторный запуск обновляет плейбук,
+но сохраняет `inventory.ini`, `group_vars/all.yml` и `credentials/`.
+
+## Запуск вручную (с управляющей машины)
 
 ```bash
 ansible-galaxy collection install -r requirements.yml
