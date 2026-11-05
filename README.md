@@ -332,3 +332,9 @@ PHP обрабатывается через **nginx + php-fpm** (по умолч
 - [Web Cluster](https://training.bitrix24.com/support/training/course/?CHAPTER_ID=026726)
 - [Push server](https://training.bitrix24.com/support/training/course/?COURSE_ID=178&LESSON_ID=21618)
 - [Transformer service](https://training.bitrix24.com/support/training/course/?LESSON_ID=31547)
+
+## Debian 13 (одиночный сервер, Ansible)
+
+В каталоге [`debian13/`](debian13/) лежит Ansible-плейбук для установки окружения
+1С-Битрикс «Управление сайтом» на Debian 13 по официальному мануалу. Подробности в
+[`debian13/README.md`](debian13/README.md).

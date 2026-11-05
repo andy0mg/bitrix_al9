@@ -1,0 +1,3 @@
+credentials/
+inventory.ini
+.ansible/

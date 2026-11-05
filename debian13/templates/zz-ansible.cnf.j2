@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+[mysqld]
+{% for k, v in bitrix_mysql_settings.items() %}
+{{ k }} = {{ v }}
+{% endfor %}

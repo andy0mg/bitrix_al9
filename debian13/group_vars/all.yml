@@ -1,0 +1,74 @@
+---
+# Архив с конфигами от 1С-Битрикс
+bitrix_config_archive_url: https://dev.1c-bitrix.ru/docs/chm_files/debian.zip
+bitrix_config_dir: /opt/debian
+
+bitrix_php_version: "8.4"
+bitrix_site_root: /var/www/html/bx-site
+bitrix_setup_script_url: https://www.1c-bitrix.ru/download/scripts/bitrixsetup.php
+bitrix_download_setup_script: true
+
+# Обновление ОС (урок «Установка и настройка ОС»)
+bitrix_upgrade_system: true
+bitrix_reboot_after_upgrade: false
+
+# MariaDB
+bitrix_db_name: portal
+bitrix_db_user: bitrix
+# Обязательно переопределите (лучше через ansible-vault)
+bitrix_db_password: ""
+
+# Redis (в мануале входит в стек и для «Управления сайтом»)
+bitrix_install_redis: true
+
+# Фаервол nftables (по умолчанию в Debian 13). Порты по мануалу: 22, 80, 443
+bitrix_configure_firewall: false
+bitrix_extra_ports: []   # например [8890, 8891] для NTLM
+
+# Дополнительные пакеты сверх списка из мануала
+bitrix_php_extra_packages:
+  - "php8.4-curl"   # нужен многим модулям и Marketplace
+  - catdoc          # индексация doc-файлов модулем поиска
+
+# Пароль БД: если пусто, генерируется и сохраняется на управляющей машине
+# в credentials/<host>-db_password (идея из bitrix-gt)
+bitrix_credentials_dir: "{{ playbook_dir }}/credentials"
+
+# Доп. настройки PHP поверх zbx-bitrix.ini из архива (подсмотрено в bitrix-gt)
+bitrix_php_settings:
+  date.timezone: Europe/Moscow
+  memory_limit: 512M
+  max_execution_time: 120
+  max_input_vars: 10000
+  post_max_size: 64M
+  upload_max_filesize: 64M
+  realpath_cache_size: 4096k
+  pcre.jit: 0
+
+# Агенты на cron: cron_events.php раз в 5 минут.
+# Не забудьте после установки включить BX_CRONTAB_SUPPORT в dbconn.php
+bitrix_enable_cron: true
+
+# Почтовый агент для mail() (Битриксу нужна отправка писем)
+bitrix_install_mta: false
+
+# Apache слушает только localhost (наружу ходит nginx)
+bitrix_apache_listen: "127.0.0.1:8090"
+
+# Доп. настройки MariaDB поверх zbx-custom.cnf (подсмотрено в bitrix-gt)
+bitrix_mysql_settings:
+  innodb_strict_mode: "OFF"
+  max_allowed_packet: 128M
+  innodb_buffer_pool_size: 384M
+
+# Скачать restore.php (восстановление из бэкапа Битрикс)
+bitrix_download_restore_script: true
+bitrix_restore_script_url: https://www.1c-bitrix.ru/download/scripts/restore.php
+
+# Почта: exim4 в режиме internet site (прямая отправка по SMTP)
+bitrix_mta_hostname: "{{ ansible_facts.fqdn }}"
+
+# Версия «Виртуальной машины Битрикс», которую видит PHP (SetEnv BITRIX_VA_VER).
+# Нужна, чтобы «Проверка системы» и монитор качества не ругались на окружение.
+# Пустая строка отключает. Сверьте с актуальной версией bitrix-env.
+bitrix_va_ver: "9.0.7"
