@@ -11,6 +11,7 @@ REPO="andy0mg/bitrix_al9"
 BRANCH="main"
 DEST="/opt/bitrix-ansible"
 RUN=0
+ASK=auto   # auto: спрашивать, если есть терминал; yes: всегда; no: никогда
 EXTRA_ARGS=()
 
 usage() {
@@ -20,6 +21,8 @@ usage() {
   --dir DIR       куда положить плейбук (по умолчанию $DEST)
   --branch NAME   ветка репозитория (по умолчанию $BRANCH)
   --run           сразу запустить плейбук на этом сервере
+  --configure     задать вопросы о компонентах (по умолчанию, если есть терминал)
+  -y, --yes       ничего не спрашивать: взять local.yml или значения по умолчанию
   -h, --help      эта справка
 
 Всё после -- передаётся в ansible-playbook, например:
@@ -32,6 +35,8 @@ while [[ $# -gt 0 ]]; do
     --dir)    DEST="$2"; shift 2 ;;
     --branch) BRANCH="$2"; shift 2 ;;
     --run)    RUN=1; shift ;;
+    --configure) ASK=yes; shift ;;
+    -y|--yes) ASK=no; shift ;;
     -h|--help) usage; exit 0 ;;
     --) shift; EXTRA_ARGS=("$@"); break ;;
     *) echo "Неизвестный параметр: $1" >&2; usage; exit 1 ;;
@@ -62,7 +67,7 @@ curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" \
 mkdir -p "$DEST"
 # Не затираем локальные настройки и сгенерированные пароли
 cp -a "$TMP/debian13/." "$DEST/.new"
-for keep in inventory.ini credentials group_vars/all.yml; do
+for keep in inventory.ini credentials group_vars/all.yml local.yml; do
   if [[ -e "$DEST/$keep" ]]; then
     rm -rf "$DEST/.new/$keep"
     mkdir -p "$(dirname "$DEST/.new/$keep")"
@@ -92,14 +97,77 @@ INV
   echo "==> Создан inventory.ini для запуска на этом сервере"
 fi
 
+# ---------- Выбор компонентов ----------
+# Ответы сохраняются в local.yml и при следующем запуске предлагаются по умолчанию.
+LOCAL="$DEST/local.yml"
+
+# Текущее значение: из local.yml, иначе значение по умолчанию
+cur() {
+  if [[ -f "$LOCAL" ]] && grep -q "^$1:" "$LOCAL"; then
+    sed -n "s/^$1: *//p" "$LOCAL" | tail -n1 | tr -d '"'
+  else
+    echo "$2"
+  fi
+}
+
+ask_bool() {   # ask_bool переменная "вопрос" true|false
+  local def ans hint
+  def="$(cur "$1" "$3")"
+  [[ "$def" == "true" ]] && hint="Y/n" || hint="y/N"
+  read -r -p "  $2 [$hint]: " ans </dev/tty || ans=""
+  case "${ans,,}" in
+    y|yes|д|да) ans=true ;;
+    n|no|н|нет) ans=false ;;
+    *) ans="$def" ;;
+  esac
+  echo "$1: $ans" >> "$LOCAL.tmp"
+}
+
+ask_str() {    # ask_str переменная "вопрос" значение_по_умолчанию
+  local def ans
+  def="$(cur "$1" "$3")"
+  read -r -p "  $2 [${def:-пусто}]: " ans </dev/tty || ans=""
+  if [[ "$ans" == "-" ]]; then ans=""      # "-" очищает значение
+  elif [[ -z "$ans" ]]; then ans="$def"; fi
+  echo "$1: \"$ans\"" >> "$LOCAL.tmp"
+}
+
+if [[ "$ASK" == "auto" ]]; then
+  if [[ -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then ASK=yes; else ASK=no; fi
+fi
+
+if [[ "$ASK" == "yes" ]]; then
+  echo
+  echo "==> Выберите компоненты (Enter — оставить значение в скобках)"
+  : > "$LOCAL.tmp"
+  ask_bool bitrix_upgrade_system        "Обновить систему (apt dist-upgrade)?"          true
+  ask_bool bitrix_reboot_after_upgrade  "Перезагрузить сервер после обновления?"        false
+  ask_bool bitrix_install_redis         "Установить Redis?"                             true
+  ask_bool bitrix_install_mta           "Установить exim4 для отправки почты?"          false
+  ask_bool bitrix_configure_firewall    "Настроить фаервол nftables (22, 80, 443)?"     false
+  ask_bool bitrix_enable_cron           "Добавить cron для агентов Битрикс?"            true
+  ask_bool bitrix_download_setup_script "Скачать bitrixsetup.php?"                      true
+  ask_bool bitrix_download_restore_script "Скачать restore.php?"                        true
+  ask_str  bitrix_va_ver                "BITRIX_VA_VER («-» — не задавать)"             "9.0.7"
+  ask_str  bitrix_db_name               "Имя базы данных"                               "portal"
+  ask_str  bitrix_db_user               "Пользователь базы данных"                      "bitrix"
+  { echo "---"; echo "# Выбор компонентов из install.sh, $(date '+%F %T')"; cat "$LOCAL.tmp"; } > "$LOCAL"
+  rm -f "$LOCAL.tmp"
+  echo "    сохранено в $LOCAL"
+fi
+
+VARS_ARGS=()
+[[ -f "$LOCAL" ]] && VARS_ARGS=(-e "@$LOCAL")
+
 if [[ $RUN -eq 1 ]]; then
   echo "==> Запускаю плейбук"
-  ansible-playbook -i inventory.ini site.yml "${EXTRA_ARGS[@]}"
+  ansible-playbook -i inventory.ini site.yml "${VARS_ARGS[@]}" "${EXTRA_ARGS[@]}"
 else
   cat <<DONE
 
 Готово. Плейбук лежит в $DEST.
-Проверьте group_vars/all.yml и запустите:
-  cd $DEST && ansible-playbook -i inventory.ini site.yml
+Запуск:
+  cd $DEST && ansible-playbook -i inventory.ini site.yml${VARS_ARGS:+ -e @local.yml}
+Поменять выбор: $DEST/install.sh --configure
 DONE
 fi
