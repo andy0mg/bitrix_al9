@@ -1,0 +1,16 @@
+{{- if include "bitrix.isAdmin" . }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-root-pvc" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.volumeSize }}
+{{- end}}

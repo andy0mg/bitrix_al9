@@ -1,0 +1,105 @@
+apiVersion: v1
+data:
+  static.conf: |
+    #
+    # static files
+    #
+    location ~* ^.+\.(jpg|jpeg|gif|png|svg|js|css|mp3|ogg|mpe?g|avi|zip|gz|bz2?|rar|html|htm|xml|jpg|jpeg|gif|png|css|flv|js|wmv|mp4|bmp|swf|ico|txt|otf|woff|woff2|ttf|eot|map|wav|tar|7z)$ {
+        log_not_found off;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control public;
+        add_header X-Content-Type-Options nosniff;
+    }
+    #
+    # internal sources
+    #
+    location ~ (/bitrix/modules|/upload/support/not_image|/bitrix/php_interface|local/modules|local/php_interface) {
+        internal;
+    }
+    #
+    # accept access for merged css and js
+    #
+    location ~* ^/bitrix/cache/(css/.+\.css|js/.+\.js)$ {
+        expires 30d;
+    }
+    #
+    # static content
+    #
+
+    location ~* ^/(upload|bitrix/images|bitrix/tmp) {
+        set $cdi $upstream_http_x_cd_info;
+        if ($cdi) {
+            more_set_headers -s 200 'Content-Disposition:$cdi';
+        }
+        expires 30d;
+    }
+
+    #
+    # fix xss on svg files in /upload/*
+    #
+    location ~* ^/upload/.+\.svg$ {
+        add_header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+    }
+    #
+    # download file from /upload/*, do not execute
+    #
+    location ~* ^/upload|tmp/.*([^/]+)\.(html|htm|php|php3|php4|php5|php6|phtml|pl|asp|aspx|cgi|dll|exe|shtm|shtml|fcg|fcgi|fpl|asmx|pht)$ {
+        add_header Content-Disposition "attachment";
+    }
+    #
+    # upload sizes
+    #
+    location ~ /upload/ {
+        client_body_buffer_size 1024m;
+        client_max_body_size 1024m;
+    }
+    
+    #
+    # local resize cache
+    #
+    location ~* ^/upload/resize_cache/x/(.+)$ {
+        internal;
+        set $new_uri $upstream_http_x_gen_src;
+        set $cdi $upstream_http_x_cd_info;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Server $host;
+        more_clear_input_headers 'Authorization';
+        if ($cdi) {
+            more_set_headers -s 200 'Content-Disposition:$cdi';
+        }
+        proxy_set_header "cookie" "";
+        proxy_set_header "content-type" "";
+        proxy_set_header "content-length" "";
+        proxy_pass $scheme://$host$resize_cache_encoded_path;
+        proxy_intercept_errors on;
+        error_page 403 404 500 502 503 504 = /$new_uri;
+    }
+    #
+    # favicon.png
+    #
+    location = /favicon.png {
+        log_not_found off;
+        access_log off;
+    }
+    #
+    # robots.txt
+    #
+    location = /robots.txt {
+        log_not_found off;
+        access_log off;
+    }
+    #
+    # player options, disable no-sniff
+    #
+    location ~* ^/bitrix/components/bitrix/player/mediaplayer/player$ {
+        add_header Access-Control-Allow-Origin *;
+    }
+    #  
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-static.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}

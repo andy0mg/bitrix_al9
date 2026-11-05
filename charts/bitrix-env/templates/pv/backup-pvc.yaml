@@ -1,0 +1,17 @@
+{{- if include "bitrix.isAdmin" . }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-backup-pvc" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.s3.backup.capacity }}
+  storageClassName: ""
+
+{{- end}}

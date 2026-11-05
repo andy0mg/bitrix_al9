@@ -1,0 +1,15 @@
+{{- if include "bitrix.isAdmin" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-scripts" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+data:
+  start.sh: |
+{{ include "bitrix.StartScript" (dict "Values" .Values) | indent 4 }}
+  
+  commit-all.sh: |
+{{ include "bitrix.gitCommitScript" (dict "Values" .Values) | indent 4 }}
+{{- end }}

@@ -1,0 +1,320 @@
+BITRIX_VA_VER: "9.0.10"
+BITRIX_ENV_TYPE: "general"
+##  @param replicaCount Count of main deployment replicas. Applicable for the `prod` environment only
+replicaCount: !!float 1
+##  @param environment Set type of environment. Allowed values: `admin` or `prod`
+##  @param volumeSize Volume size for project. Not applicable for `prod` environment
+##  @param storageClassName Specify the storage class for the volume. Applicable only in the `admin` environment
+environment: admin
+volumeSize: "100Gi"
+reclaimPolicy: Retain
+storageClassName: "yc-network-ssd"
+##  @param fqdn Set project URL
+##  @param loadBalancerIP It is possible to set a specific address for the load balancer in advance
+##  @param externalTrafficPolicy Incoming external traffic Routing Policy
+##  Allowed values: `Cluster` or `Local`
+fqdn: ""
+loadBalancerIP: ""
+externalTrafficPolicy: "Local"
+#  @param bitrixScripts.bitrixsetup Download the bitrix script to deploy the project from scratch
+#  @param bitrixScripts.restore Download the bitrix script to deploy the project from a backup copy
+#  Parameters ignored if Bitrix installation already exists in the working directory
+bitrixScripts:
+    bitrixsetup: true
+    restore: false
+##  @param git.repoUrl Specify the address of the git repository
+##  @param git.branch Specify the repository branch
+##  @param git.name Specify the git user
+##  @param git.email Specify the git user's email address
+##  @param git.secret Specify a base64-encoded ssh key to access the git repository
+git:
+    repoUrl: ""
+    branch: "main"
+    name: ""
+    email: ""
+    secret: ""
+##  https://yandex.cloud/ru/docs/iam/operations/authentication/manage-access-keys#create-access-key
+##  @param s3.secret.accessKey Specify The ID of the S3 access key.
+##  @param s3.secret.secretKey Specify S3 secret key
+##  @param s3.bucket Specify the S3 bucket where the upload and backup folders will be stored
+##  @param s3.upload.capacity Do not change the default value as CSI-S3 ignores it anyway, but pv don't.
+##  @param s3.backup.capacity Do not change the default value as CSI-S3 ignores it anyway, but pv don't.
+s3:
+    storageClassName: csi-s3
+    secret:
+        accessKey: ""
+        secretKey: ""
+        endpoint: https://storage.yandexcloud.net
+        region: ru-central1
+    bucket: ""
+    upload:
+        capacity: "1Gi"
+    backup:
+        capacity: "1Gi"
+##  https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=37&LESSON_ID=9325
+##  https://yandex.ru/support/id/ru/authorization/app-passwords
+##  @param  msmtprc.host Specify SMTP host
+##  @param  msmtprc.port Specify SMTP port
+##  @param  msmtprc.user Specify the mailbox user
+##  @param  msmtprc.password Specify the mailbox password
+msmtprc:
+    host: ""
+    port: ""
+    user: ""
+    password: ""
+##  @param mysql.host Specify the mysql host
+##  @param mysql.login Specify the mysql user
+##  @param mysql.password Specify the mysql password
+##  @param mysql.database Specify the mysql database
+mysql:
+    host: ""
+    login: null
+    password: ""
+    database: ""
+##  https://github.com/bitnami/charts/blob/main/bitnami/redis/README.md
+redis:
+    global:
+        defaultStorageClass: yc-network-ssd
+        security:
+            allowInsecureImages: true
+    image:
+        registry: cr.yandex/yc-marketplace
+        repository: yandex-cloud/bitrix-env/bitnami/redis1775660129087745327177484940704164668665505295409
+        tag: "8.6.2"
+    sentinel:
+        image:
+            registry: cr.yandex/yc-marketplace
+            repository: yandex-cloud/bitrix-env/bitnami/redis-sentinel1775660129087745327177484940704164668665505295409
+            tag: "8.6.2"
+    metrics:
+        image:
+            registry: cr.yandex/yc-marketplace
+            repository: yandex-cloud/bitrix-env/bitnami/redis-exporter1775660129087745327177484940704164668665505295409
+            tag: "1.82.0"
+    volumePermissions:
+        image:
+            registry: cr.yandex/yc-marketplace
+            repository: yandex-cloud/bitrix-env/bitnami/os-shell1775660129087745327177484940704164668665505295409
+            tag: "5"
+    kubectl:
+        image:
+            registry: cr.yandex/yc-marketplace
+            repository: yandex-cloud/bitrix-env/bitnami/kubectl1775660129087745327177484940704164668665505295409
+            tag: "1.35.3"
+    port: !!float 6379
+    master:
+        resourcesPreset: 2xlarge
+    replica:
+        resourcesPreset: medium
+    auth:
+        enabled: false
+##  https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+webProbe:
+    enabled: true
+    httpGet:
+        path: /stub_status
+        port: !!float 8080
+        scheme: HTTP
+    initialDelaySeconds: !!float 2
+    periodSeconds: !!float 10
+    timeoutSeconds: !!float 10
+    successThreshold: !!float 1
+    failureThreshold: !!float 3
+phpProbe:
+    enabled: true
+    httpGet:
+        path: /status
+        port: !!float 8080
+        scheme: HTTP
+    initialDelaySeconds: !!float 2
+    periodSeconds: !!float 10
+    timeoutSeconds: !!float 10
+    successThreshold: !!float 1
+    failureThreshold: !!float 3
+## @param features.git Enable git. Not applicable in the prod environment.
+## @param features.cron Enable cron. It is recommended to enable cron only in one of the `admin` or `prod` environments
+## @param features.push Enable push and pull
+## @param features.sphinx Enable sphinx
+## @param features.cache Enable cache. Use redis for cache storage. Always enabled in `prod`` environment, not recommended in `admin`` environment
+## @param features.phpExporter Enable php exporter for metrics. https://github.com/hipages/php-fpm_exporter
+## @param features.nginxExporter Enable nginx exporter for metrics. https://github.com/nginx/nginx-prometheus-exporter
+features:
+    git: false
+    cron: true
+    push: true
+    sphinx: true
+    cache: false
+    phpExporter: true
+    nginxExporter: true
+## Images
+pullPolicy: IfNotPresent
+fix:
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/alpine/fix1775660129087745327177484940704164668665505295409
+    tag: "1.1"
+gitimage:
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/alpine/git1775660129087745327177484940704164668665505295409
+    tag: "1.1"
+    resources:
+        requests:
+            cpu: 100m
+            memory: 128Mi
+        limits:
+            cpu: 1000m
+            memory: 2Gi
+nginx:
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/bitrix/bitrix-admin-nginx1775660129087745327177484940704164668665505295409
+    tag: "1.28.3-v1"
+    resources:
+        # limits:
+        #   cpu: 2000m
+        #   memory: 2Gi
+        requests:
+            cpu: 500m
+            memory: 500Mi
+php:
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/bitrix/bitrix-admin-php177566012908774532717748494070416466866550529540917756601290877453271774849407041646686655052954091775660129087745327177484940704164668665505295409
+    tag: "8.2.30"
+    tag8230: "8.2.30"
+    tag8330: "8.3.30"
+    tag8419: "8.4.19"
+    defaultTag: "8.2.30"
+    resources:
+        # limits:
+        #   cpu: 4000m
+        #   memory: 4Gi
+        requests:
+            cpu: 500m
+            memory: 500Mi
+## @param push.key Secret push key, get it with docker:
+## docker container run --rm --name push_server_key_generate alpine:3.21 sh -c "(cat /dev/urandom | tr -dc A-Za-z0-9 | head -c 128) && echo ''"  
+push:
+    replicaCount: !!float 1
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/bitrix/bitrix-push-server1775660129087745327177484940704164668665505295409
+    tag: "3.2-v1"
+    key: "somesecretkey"
+    resources: {}
+sphinx:
+    replicaCount: !!float 1
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/bitrix/bitrix-sphinx1775660129087745327177484940704164668665505295409
+    tag: "2.2.11-v2"
+    resources: {}
+phpExporter:
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/hipages/php-fpm_exporter1775660129087745327177484940704164668665505295409
+    tag: "2.2.0"
+    resources: {}
+nginxExporter:
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/nginx/nginx-prometheus-exporter1775660129087745327177484940704164668665505295409
+    tag: "1.5.1"
+    resources: {}
+kubelet:
+    registry: cr.yandex/yc-marketplace
+    repository: yandex-cloud/bitrix-env/bitnami/kubectl1775660129087745327177484940704164668665505295409
+    tag: "1.35.3"
+##  https://yandex.cloud/ru/docs/managed-kubernetes/operations/applications/cert-manager-cloud-dns
+##  https://letsencrypt.org/ru/docs/challenge-types/#проверка-dns-01
+##  DNS-01 is used to pass the check. Yandex Cloud DNS is used to pass the check.
+##  Make sure that the Managed Service for Kubernetes cluster is located in the same folder as 
+##  the public Cloud DNS zone.
+certmanager:
+    enabled: true
+    issuer: "yc-clusterissuer"
+    email: "user@example.ru"
+##  @param tls.existingSecret Use secret with own certificate data
+##  @param tls.certificate Use to set the own certificate. You must disable the use of certmanager
+##  and don't use `existingSecret`
+##  @param tls.privateKey Use the to set the own certificate. You must disable the use of certmanager
+##  and don't use `existingSecret`
+tls:
+    existingSecret: ""
+    certificate: ""
+    # certificate: |
+    #   -----BEGIN CERTIFICATE-----
+    #   MIIFaz...
+    #   -----END CERTIFICATE-----
+    privateKey: ""
+    # privateKey: |
+    #   -----BEGIN PRIVATE KEY-----
+    #   MIIEvw...
+    #   -----END PRIVATE KEY-----
+## Scheduling for main deployment
+## https://kubernetes.io/docs/concepts/scheduling-eviction/
+mainSchedulling:
+    enabled: false
+    nodeAffinity: {}
+    # requiredDuringSchedulingIgnoredDuringExecution:
+    #   nodeSelectorTerms:
+    #   - matchExpressions:
+    #     - key: for
+    #       operator: In
+    #       values:
+    #       - admin
+
+    podAffinity: {}
+    # preferredDuringSchedulingIgnoredDuringExecution:
+    # - weight: 100
+    #   podAffinityTerm:
+    #     labelSelector:
+    #       matchLabels:
+    #         app.kubernetes.io/name: redis
+    #         app.kubernetes.io/instance: "{{ .Release.Name }}"
+    #         app.kubernetes.io/component: master
+    #     topologyKey: kubernetes.io/hostname               
+
+    nodeSelector: {}
+    # Example:
+    # disktype: ssd
+    # environment: production
+
+    # Tolerations for pod assignment
+    tolerations: []
+    # Example:
+    # - key: "key1"
+    #   operator: "Equal"
+    #   value: "value1"
+    #   effect: "NoSchedule"
+    # - key: "key1"
+    #   operator: "Exists"
+    #   effect: "NoExecute"
+    #   tolerationSeconds: 3600
+## Scheduling for cron deployments
+## https://kubernetes.io/docs/concepts/scheduling-eviction/
+cronSchedulling:
+    enabled: false
+    nodeAffinity: {}
+    podAffinity: {}
+    podAntiAffinity: {}
+    nodeSelector: {}
+    tolerations: []
+## Scheduling for push deployments
+## https://kubernetes.io/docs/concepts/scheduling-eviction/
+pushSchedulling:
+    enabled: false
+    nodeAffinity: {}
+    podAffinity: {}
+    podAntiAffinity: {}
+    nodeSelector: {}
+    tolerations: []
+## Scheduling for sphinx deployment
+## https://kubernetes.io/docs/concepts/scheduling-eviction/
+sphinxSchedulling:
+    enabled: false
+    nodeAffinity: {}
+    podAffinity: {}
+    podAntiAffinity: {}
+    # requiredDuringSchedulingIgnoredDuringExecution:
+    # - labelSelector:
+    #     matchLabels:
+    #       app.kubernetes.io/name: redis
+    #       app.kubernetes.io/instance: "{{ .Release.Name }}"
+    #       app.kubernetes.io/component: master
+    #   topologyKey: kubernetes.io/hostname
+    nodeSelector: {}
+    tolerations: []

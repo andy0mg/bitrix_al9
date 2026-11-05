@@ -1,0 +1,45 @@
+apiVersion: v1
+data:
+  php.ini: |
+    [php]
+    short_open_tag = On
+    display_errors = Off
+    session.gc_maxlifetime = 86400
+    session.cookie_secure = On
+    request_order = "GP"
+    allow_url_fopen = Off
+    auto_prepend_file = /home/bitrix/www/bitrix/modules/security/tools/start.php
+    error_log = "/proc/self/fd/2"
+    log_errors_max_len = 2048
+    error_reporting = E_ALL ^ E_DEPRECATED ^ E_WARNING
+    log_errors = On
+    display_startup_errors = On
+    cgi.fix_pathinfo = 0
+    date.timezone = "Europe/Moscow"
+    mbstring.func_overload = 2
+    mbstring.internal_encoding = ""
+    default_charset = "UTF-8"
+    max_input_vars = 10000
+    memory_limit = 4G
+    realpath_cache_size = 4M
+    realpayj_cache_ttl = 600
+    expose_php = Off
+    file_uploads = On
+    post_max_size = 1024M
+    upload_max_filesize = 1024M
+    sendmail_path = msmtp -t -i
+    [opcache]
+    opcache.revalidate_freq = 0
+    opcache.validate_timestamps = 1
+    opcache.max_accelerated_files = 100000
+    opcache.memory_consumption = 512
+    opcache.interned_strings_buffer = 64
+    opcache.fast_shutdown = 1
+    opcache.error_log = "/proc/self/fd/2"
+    session.save_path = "/home/.bx_temp"
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-php.ini" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}

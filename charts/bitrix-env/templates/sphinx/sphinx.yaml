@@ -1,0 +1,58 @@
+{{- if include "bitrix.sphinxEnabled" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+  name: {{ printf "%s-sphinx" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.sphinx.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ printf "%s-sphinx" (include "bitrix.fullname" .) }}
+      {{- include "bitrix.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ printf "%s-sphinx" (include "bitrix.fullname" .) }}
+        {{- include "bitrix.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "chart.scheduling" (dict "values" .Values.sphinxSchedulling "context" .) | nindent 6 }}
+      containers:
+      - name: sphinx
+        {{- $sphinx := .Values.sphinx }}
+        image: {{ $sphinx.registry }}/{{ $sphinx.repository }}:{{ $sphinx.tag }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        resources:
+          {{- toYaml $sphinx.resources | nindent 10 }}
+        ports:
+        - containerPort: 9306
+          protocol: TCP  
+        volumeMounts:
+        - name: sphinx-conf
+          mountPath: /opt/sphinx/conf/sphinx.conf
+          subPath: sphinx.conf
+      volumes:
+      - name: sphinx-conf
+        configMap:
+          name: {{ printf "%s-sphinx.conf" (include "bitrix.fullname" .) }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-sphinx" .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  ports:
+  - port: 9306
+    protocol: TCP
+    targetPort: 9306
+  selector:
+    app: {{ printf "%s-sphinx" (include "bitrix.fullname" .) }}
+    {{- include "bitrix.selectorLabels" . | nindent 4 }}
+  type: ClusterIP
+{{- end }}

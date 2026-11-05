@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ printf "%s-msmtprc" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+data:
+  msmtprc: {{ tpl `
+account default
+logfile -
+host {{ .Values.msmtprc.host }}
+port {{ .Values.msmtprc.port }}
+from {{ .Values.msmtprc.from }}
+auth on
+user {{ .Values.msmtprc.user }}
+password {{ .Values.msmtprc.password }}
+tls on
+tls_starttls on
+tls_certcheck off
+keepbcc on` $ | trim | b64enc }}

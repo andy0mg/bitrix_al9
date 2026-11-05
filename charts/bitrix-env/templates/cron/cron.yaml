@@ -1,0 +1,97 @@
+{{- if and (include "bitrix.isProd" .) (include "bitrix.cronEnabled" .) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+  name: {{ printf "%s-cron" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ printf "%s-cron" (include "bitrix.fullname" .) }}
+      {{- include "bitrix.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ printf "%s-cron" (include "bitrix.fullname" .) }}
+        {{- include "bitrix.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "chart.scheduling" (dict "values" .Values.cronSchedulling "context" .) | nindent 6 }}
+      containers:
+      - name: cron
+        {{- $php := .Values.php }}
+        {{- if (include "bitrix.isProd" .) }}
+        image: {{ $php.image }}
+        {{- else }}
+        image: {{ $php.registry }}/{{ $php.repository }}:{{ include "php.resolveFullTag" . }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        workingDir: /home/bitrix/www
+        args: ["-f"]
+        command: ["cron"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "pkill php"]
+        resources: 
+          {{- toYaml $php.resources | nindent 10 }}
+        ports:
+        - containerPort: 9000
+          protocol: TCP
+        volumeMounts:
+        - name: www-conf
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/fpm/pool.d
+        - name: php-ini
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/fpm/php.ini
+          subPath: php.ini
+        - name: php-ini
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/cli/php.ini
+          subPath: php.ini
+        - name: bitrix-configs
+          mountPath: /home/bitrix/www/bitrix/.settings.php
+          subPath: .settings.php
+        - name: bitrix-configs
+          mountPath: /home/bitrix/www/bitrix/.settings_extra.php
+          subPath: .settings_extra.php
+        - name: bitrix-configs
+          mountPath: /home/bitrix/www/bitrix/php_interface/after_connect_d7.php
+          subPath: after_connect_d7.php
+        - name: bitrix-configs
+          mountPath: /home/bitrix/www/bitrix/php_interface/dbconn.php
+          subPath: dbconn.php
+        - name: upload
+          mountPath: /home/bitrix/www/upload
+        - name: msmtprc
+          mountPath: /etc/msmtprc
+          subPath: msmtprc   
+        - name: cron
+          mountPath: /etc/cron.d/root
+          subPath: root
+        - name: cron-events
+          mountPath: /home/bitrix/www/bitrix/php_interface/cron_events.php
+          subPath: cron_events.php   
+      volumes:
+      - name: php-ini  
+        configMap:
+          name: {{ printf "%s-php.ini" (include "bitrix.fullname" .) }}
+      - name: www-conf    
+        configMap:
+          name: {{ printf "%s-www.conf" (include "bitrix.fullname" .) }}     
+      - name: bitrix-configs 
+        secret:
+          secretName: {{ printf "%s-configs" (include "bitrix.fullname" .) }}
+      - name: upload
+        persistentVolumeClaim:
+          claimName: {{ printf "%s-upload-pvc" (include "bitrix.fullname" .) }} 
+      - name: msmtprc
+        secret:
+          secretName: {{ printf "%s-msmtprc" (include "bitrix.fullname" .) }}
+      - name: cron
+        configMap:
+          name: {{ printf "%s-cron" (include "bitrix.fullname" .) }}
+      - name: cron-events
+        configMap:
+          name: {{ printf "%s-cron-events" (include "bitrix.fullname" .) }}  
+{{- end }}

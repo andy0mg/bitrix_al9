@@ -1,0 +1,19 @@
+{{- if .Values.certmanager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-cert" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  secretName: {{ printf "%s-cert" (include "bitrix.fullname" .) }}
+  issuerRef:
+    kind: ClusterIssuer
+    name: {{ .Values.certmanager.issuer }}
+  dnsNames:
+  - {{ .Values.fqdn }}
+{{- end }}

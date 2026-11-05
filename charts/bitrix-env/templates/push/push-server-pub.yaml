@@ -1,0 +1,61 @@
+{{- if include "bitrix.pushEnabled" . }}
+apiVersion: v1
+stringData:
+  push-server-pub.json: |-
+    {
+        "servers":
+        [
+            {
+                "name": "pub-9010",
+                "port": 9010,
+                "hostname": "0.0.0.0",
+                "backlog": 1024,
+                "routes":
+            {
+                    "pub": "/bitrix/pub/",
+                    "stat": "/server-stat/",
+                    "rest": "/bitrix/rest/"
+                }
+            }
+        ],
+        "publishMode": true,
+        "dataDir": "/opt/push-server/data",
+        "processUniqueId": "pub-9010",
+        "clusterMode": true,
+        "storage":
+        {
+            "type": "redis",
+            "messageTLL": 86400,
+            "channelTLL": 86400,
+            "onlineTLL": 120,
+            "onlineDelta": 10,
+            "host": "{{ .Release.Name }}-redis-master",
+            "port": {{ .Values.redis.port }}
+        },
+        "security":
+        {
+            "key": "{{ .Values.push.key }}"
+        },
+        "limits":
+        {
+            "maxPayload": 1048576,
+            "maxConnPerChannel": 100,
+            "maxMessagesPerRequest": 100,
+            "maxChannelsPerRequest": 100,
+            "maxRequestsPerSecond": 50
+        },
+        "debug":
+        {
+            "folderName": "/var/log/push-server",
+            "ip": ["127.0.0.256"],
+            "trustProxy": true
+        }
+    }    
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ printf "%s-push-server-pub.json" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+{{- end }}

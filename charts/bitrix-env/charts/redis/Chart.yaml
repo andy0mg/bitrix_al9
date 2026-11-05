@@ -1,0 +1,52 @@
+name: redis
+home: https://bitnami.com
+sources:
+    - https://github.com/bitnami/charts/tree/main/bitnami/redis
+version: 25.3.9
+description: Redis(R) is an open source, advanced key-value store. It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets and sorted sets.
+keywords:
+    - redis
+    - keyvalue
+    - database
+maintainers:
+    - name: Broadcom, Inc. All Rights Reserved.
+      email: ""
+      url: https://github.com/bitnami/charts
+icon: https://dyltqmyl993wv.cloudfront.net/assets/stacks/redis/img/redis-stack-220x234.png
+apiversion: v2
+condition: ""
+tags: ""
+appversion: 8.6.2
+deprecated: false
+annotations:
+    fips: "true"
+    images: |
+        - name: kubectl
+          version: 1.35.3
+          image: registry-1.docker.io/bitnami/kubectl:latest
+        - name: os-shell
+          version: "5"
+          image: registry-1.docker.io/bitnami/os-shell:latest
+        - name: redis
+          version: 8.6.2
+          image: registry-1.docker.io/bitnami/redis:latest
+        - name: redis-exporter
+          version: 1.82.0
+          image: registry-1.docker.io/bitnami/redis-exporter:latest
+        - name: redis-sentinel
+          version: 8.6.2
+          image: registry-1.docker.io/bitnami/redis-sentinel:latest
+    licenses: Apache-2.0
+    tanzuCategory: service
+kubeversion: ""
+dependencies:
+    - name: common
+      version: 2.37.0
+      repository: file://charts/common
+      condition: ""
+      tags:
+        - bitnami-common
+      enabled: false
+      importvalues: []
+      alias: ""
+type: ""

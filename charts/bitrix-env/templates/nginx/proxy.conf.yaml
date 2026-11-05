@@ -1,0 +1,26 @@
+apiVersion: v1
+data:
+  proxy.conf: |
+    #
+    # bitrixsetup script
+    #
+    location ^~ ^(/bitrixsetup\.php)$ {
+        proxy_buffering off;
+    }
+    #
+    # pub and online + telephony and voximplant
+    #
+    #location ~* ^/(pub/|online/|services/telephony/info_receiver.php|/bitrix/tools/voximplant/) {
+    #    add_header X-Frame-Options '' always;
+    #    #
+    #    location ~* ^/(pub/imconnector/|pub/imbot.php|services/telephony/info_receiver.php|bitrix/tools/voximplant/) {
+    #	proxy_ignore_client_abort on;
+    #    }
+    #}
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-proxy.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}

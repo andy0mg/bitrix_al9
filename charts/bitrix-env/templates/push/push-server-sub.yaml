@@ -1,0 +1,50 @@
+{{- if include "bitrix.pushEnabled" . }}
+apiVersion: v1
+stringData:
+  push-server-sub.json: |-
+    {
+        "servers":
+        [
+            {
+                "name": "sub-8010",
+                "port": 8010,
+                "hostname": "0.0.0.0",
+                "backlog": 1024,
+                "routes":
+            {
+                    "sub": "/bitrix/subws/"
+                }
+            }
+        ],
+        "dataDir": "/opt/push-server/data",
+        "clusterMode": true,
+        "processUniqueId": "sub-8010",
+        "storage":
+        {
+            "type": "redis",
+            "messageTLL": 86400,
+            "channelTLL": 86400,
+            "onlineTLL": 120,
+            "onlineDelta": 10,
+            "host": "{{ .Release.Name }}-redis-master",
+            "port": {{ .Values.redis.port }}
+        },
+        "security":
+        {
+            "key": "{{ .Values.push.key }}"
+        },
+        "debug":
+        {
+            "folderName": "/var/log/push-server",
+            "ip": ["127.0.0.256"],
+            "trustProxy": true
+        }
+    }
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ printf "%s-push-server-sub.json" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+{{- end }}

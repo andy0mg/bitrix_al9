@@ -1,0 +1,431 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+  name: {{ printf "%s-main" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  {{- if (include "bitrix.isAdmin" .) }}
+  replicas: 1
+  strategy:
+    type: Recreate
+  {{- else }}
+  replicas: {{ .Values.replicaCount | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ printf "%s-main" (include "bitrix.fullname" .) }}
+      {{- include "bitrix.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+      labels:
+        app: {{ printf "%s-main" (include "bitrix.fullname" .) }}
+        {{- include "bitrix.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "chart.scheduling" (dict "values" .Values.mainSchedulling "context" .) | nindent 6 }}
+      initContainers:
+      - name: wait-for-certificate
+        {{- $wait := .Values.kubelet }}
+        image: {{ $wait.registry }}/{{ $wait.repository }}:{{ $wait.tag }}
+        command: ["sh", "-c", {{ include "bitrix.wait" . | quote }}]
+      {{- if  include "bitrix.isAdmin" . }}
+      - name: fix
+        {{- $setperm := .Values.fix }}
+        image: {{ $setperm.registry }}/{{ $setperm.repository }}:{{ $setperm.tag }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        command: ["sh", "-c", {{- include "setPermission" . | quote }}]
+        volumeMounts:
+        - name: root
+          mountPath: /home/bitrix/www
+      {{- end }}
+      containers:
+      {{- if (include "bitrix.isAdmin" .) }}
+      - name: git
+        {{- $git := .Values.gitimage }}
+        image: {{ $git.registry }}/{{ $git.repository }}:{{ $git.tag }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        workingDir: /home/bitrix/www
+        resources:
+          {{- toYaml $git.resources | nindent 10 }}
+        command: ["/bin/sh", "-c", "/scripts/start.sh"]
+        volumeMounts:
+        - name: root
+          mountPath: /home/bitrix/www
+        - name: scripts
+          mountPath: /scripts
+        {{- if (include "bitrix.gitEnabled" .) }}  
+        - name: git-ssh
+          mountPath: /tmp
+        - name: gitignore
+          mountPath: /home/git/.gitignore
+          subPath: .gitignore
+        {{- end }}  
+        - name: configs
+          mountPath: /home/git/.settings.php
+          subPath: .settings.php
+        - name: configs
+          mountPath: /home/git/.settings_extra.php
+          subPath: .settings_extra.php 
+        - name: configs
+          mountPath: /home/git/dbconn.php
+          subPath: dbconn.php
+        - name: configs
+          mountPath: /home/git/after_connect_d7.php
+          subPath: after_connect_d7.php
+        {{- if include "bitrix.cronEnabled" . }}  
+        - name: cron-events
+          mountPath: /home/git/cron_events.php
+          subPath: cron_events.php
+        {{- end }}  
+        - name: index
+          mountPath: /home/git/index.html
+          subPath: index.html
+      {{- end }}
+      {{- if and (include "bitrix.isAdmin" .) (include "bitrix.cronEnabled" .) }}
+      - name: cron
+        {{- $php := .Values.php }}
+        {{- if (include "bitrix.isProd" .) }}
+        image: "{{ $php.image }}"
+        {{- else }}
+        image: {{ $php.registry }}/{{ $php.repository }}:{{ include "php.resolveFullTag" . }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        env:
+        - name: BITRIX_VA_VER
+          value: {{ .Values.BITRIX_VA_VER }}
+        - name: BITRIX_ENV_TYPE
+          value: {{ .Values.BITRIX_ENV_TYPE }}
+        workingDir: /home/bitrix/www
+        args: ["-f"]
+        command: ["cron"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "pkill php"]
+        resources: 
+          {{- toYaml $php.resources | nindent 10 }}
+        volumeMounts:
+        {{- if  include "bitrix.isAdmin" . }}
+        - name: root 
+          mountPath: /home/bitrix/www
+        {{- end }}
+        - name: www-conf
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/fpm/pool.d
+          readOnly: true
+        - name: php-ini
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/fpm/php.ini
+          subPath: php.ini
+          readOnly: true
+        - name: php-ini
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/cli/php.ini
+          subPath: php.ini
+          readOnly: true
+        - name: upload
+          mountPath: /home/bitrix/www/upload
+        - name: backup
+          mountPath: /home/bitrix/www/bitrix/backup
+        - name: cron
+          mountPath: /etc/cron.d/root
+          subPath: root     
+      {{- end }}
+      - name: nginx
+        {{- $nginx := .Values.nginx }}
+        {{- if (include "bitrix.isProd" .) }}
+        image: {{ $nginx.image }}
+        {{- else }}
+        image: {{ $nginx.registry }}/{{ $nginx.repository }}:{{ $nginx.tag }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        workingDir: /home/bitrix/www
+        resources: 
+          {{- toYaml $nginx.resources | nindent 10 }}
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "sleep 15 && /usr/sbin/nginx -s quit"]
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        - containerPort: 8893
+          protocol: TCP  
+        {{- if .Values.webProbe.enabled }}      
+        startupProbe:
+          {{- omit .Values.webProbe "enabled" | toYaml | nindent 10 }}
+        livenessProbe:
+          {{- omit .Values.webProbe "enabled" | toYaml | nindent 10 }}
+        readinessProbe:
+          {{- omit .Values.webProbe "enabled" | toYaml | nindent 10 }}
+        {{- end }}  
+        volumeMounts:
+        {{- if  include "bitrix.isAdmin" . }}
+        - name: root
+          mountPath: /home/bitrix/www
+        {{- end }}
+        - name: nginx-conf
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        - name: nginx-conf-d
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+          readOnly: true
+        - name: block-conf
+          mountPath: /etc/nginx/inc/block.conf
+          subPath: block.conf
+        - name: bx-temp-conf
+          mountPath: /etc/nginx/inc/bx_temp.conf
+          subPath: bx_temp.conf
+        - name: clouds-conf
+          mountPath: /etc/nginx/inc/clouds.conf
+          subPath: clouds.conf
+        - name: composite-conf
+          mountPath: /etc/nginx/inc/composite.conf
+          subPath: composite.conf
+        - name: dav-conf
+          mountPath: /etc/nginx/inc/dav.conf
+          subPath: dav.conf
+        - name: errors-conf
+          mountPath: /etc/nginx/inc/errors.conf
+          subPath: errors.conf
+        - name: modules-conf
+          mountPath: /etc/nginx/inc/modules.conf
+          subPath: modules.conf
+        - name: proxy-conf
+          mountPath: /etc/nginx/inc/proxy.conf
+          subPath: proxy.conf
+        - name: push-conf
+          mountPath: /etc/nginx/inc/push.conf
+          subPath: push.conf 
+        - name: static-conf
+          mountPath: /etc/nginx/inc/static.conf
+          subPath: static.conf
+        - name: im-settings-conf
+          mountPath: /etc/nginx/maps/im_settings.conf
+          subPath: im_settings.conf
+        - name: errors-html
+          mountPath: /etc/nginx/errors
+        - name: intranet-conf
+          mountPath: /etc/nginx/inc/intranet.conf
+          subPath: intranet.conf
+        - name: resize-cache-conf
+          mountPath: /etc/nginx/maps/resize_cache.conf
+          subPath: resize_cache.conf          
+        - name: ssl-conf
+          mountPath: /etc/nginx/inc/ssl.conf
+          subPath: ssl.conf
+        - name: tls
+          mountPath: /etc/nginx/ssl
+        {{- if include "bitrix.isProd" . }}
+        - name: cache 
+          mountPath: /home/bitrix/www/bitrix/cache
+        {{- end }}  
+        - name: upload
+          mountPath: /home/bitrix/www/upload
+      - name: php
+        {{- $php := .Values.php }}
+        {{- if (include "bitrix.isProd" .) }}
+        image: {{ $php.image }}
+        {{- else }}
+        image: {{ $php.registry }}/{{ $php.repository }}:{{ include "php.resolveFullTag" .}}
+        {{- end }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        env:
+        - name: BITRIX_VA_VER
+          value: {{ .Values.BITRIX_VA_VER }}
+        - name: BITRIX_ENV_TYPE
+          value: {{ .Values.BITRIX_ENV_TYPE }}
+        workingDir: /home/bitrix/www
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "pkill php"]
+        resources: 
+          {{- toYaml $php.resources | nindent 10 }}
+        ports:
+        - containerPort: 9000
+          protocol: TCP
+        {{- if .Values.phpProbe.enabled }}
+        startupProbe:
+          {{- omit .Values.phpProbe "enabled" | toYaml | nindent 10 }}
+        livenessProbe:
+          {{- omit .Values.phpProbe "enabled" | toYaml | nindent 10 }}
+        readinessProbe:
+          {{- omit .Values.phpProbe "enabled" | toYaml | nindent 10 }}
+        {{- end }}    
+        volumeMounts:
+        {{- if  include "bitrix.isAdmin" . }}
+        - name: root 
+          mountPath: /home/bitrix/www
+        - name: backup
+          mountPath: /home/bitrix/www/bitrix/backup
+        {{- end }}
+        - name: www-conf
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/fpm/pool.d
+        - name: php-ini
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/fpm/php.ini
+          subPath: php.ini
+        - name: php-ini
+          mountPath: /etc/php/{{ include "php.resolveTag" . }}/cli/php.ini
+          subPath: php.ini
+        {{- if  include "bitrix.isProd" . }}
+        - name: configs
+          mountPath: /home/bitrix/www/bitrix/.settings.php
+          subPath: .settings.php
+        - name: configs
+          mountPath: /home/bitrix/www/bitrix/.settings_extra.php
+          subPath: .settings_extra.php
+        - name: configs
+          mountPath: /home/bitrix/www/bitrix/php_interface/after_connect_d7.php
+          subPath: after_connect_d7.php
+        - name: configs
+          mountPath: /home/bitrix/www/bitrix/php_interface/dbconn.php
+          subPath: dbconn.php
+        {{- if include "bitrix.isProd" . }}
+        - name: cache 
+          mountPath: /home/bitrix/www/bitrix/cache
+        {{- end }}  
+        {{- end }}
+        - name: upload
+          mountPath: /home/bitrix/www/upload
+        - name: msmtprc
+          mountPath: /etc/msmtprc
+          subPath: msmtprc
+      {{- if include "bitrix.phpExporterEnabled" . }}     
+      - name: php-exporter
+      {{- $phpExporter := .Values.phpExporter }}
+        image: {{ $phpExporter.registry }}/{{ $phpExporter.repository }}:{{ $phpExporter.tag }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        env:
+        - name: PHP_FPM_SCRAPE_URI
+          value: "tcp://127.0.0.1:8080/status"
+        - name: PHP_FPM_FIX_PROCESS_COUNT
+          value: "true"
+        resources: 
+          {{- toYaml $phpExporter.resources | nindent 10 }}  
+        ports:
+        - containerPort: 9253
+          protocol: TCP  
+      {{- end }}
+      {{- if include "bitrix.nginxExporterEnabled" . }}     
+      - name: nginx-exporter
+      {{- $nginxExporter := .Values.nginxExporter }}
+        image: {{ $nginxExporter.registry }}/{{ $nginxExporter.repository }}:{{ $nginxExporter.tag }}
+        imagePullPolicy: {{ .Values.pullPolicy | default "IfNotPresent" }}
+        args:
+        - "-nginx.scrape-uri=http://localhost:8080/stub_status"
+        ports:
+        - containerPort: 9113
+          protocol: TCP
+        resources: 
+          {{- toYaml $nginxExporter.resources | nindent 10 }}   
+      {{- end }}
+      volumes:
+      - name: php-ini  
+        configMap:
+          name: {{ printf "%s-php.ini" (include "bitrix.fullname" .) }}
+      - name: www-conf    
+        configMap:
+          name: {{ printf "%s-www.conf" (include "bitrix.fullname" .) }}
+      - name: nginx-conf
+        configMap:
+          name: {{ printf "%s-nginx.conf" (include "bitrix.fullname" .) }}  
+      - name: nginx-conf-d  
+        configMap:
+          name: {{ printf "%s-nginx.conf.d" (include "bitrix.fullname" .) }}
+      - name: block-conf
+        configMap:
+          name: {{ printf "%s-block.conf" (include "bitrix.fullname" .) }}
+      - name: bx-temp-conf
+        configMap:
+          name: {{ printf "%s-bx-temp.conf" (include "bitrix.fullname" .) }}
+      - name: clouds-conf
+        configMap:
+          name: {{ printf "%s-clouds.conf" (include "bitrix.fullname" .) }}
+      - name: composite-conf
+        configMap:
+          name: {{ printf "%s-composite.conf" (include "bitrix.fullname" .) }}
+      - name: dav-conf
+        configMap:
+          name: {{ printf "%s-dav.conf" (include "bitrix.fullname" .) }}
+      - name: errors-conf
+        configMap:
+          name: {{ printf "%s-errors.conf" (include "bitrix.fullname" .) }}
+      - name: modules-conf
+        configMap:
+          name: {{ printf "%s-modules.conf" (include "bitrix.fullname" .) }}
+      - name: proxy-conf
+        configMap:
+          name: {{ printf "%s-proxy.conf" (include "bitrix.fullname" .) }}
+      - name: push-conf
+        configMap:
+          name: {{ printf "%s-push.conf" (include "bitrix.fullname" .) }}
+      - name: static-conf
+        configMap:
+          name: {{ printf "%s-static.conf" (include "bitrix.fullname" .) }}
+      - name: im-settings-conf
+        configMap:
+          name: {{ printf "%s-im-settings.conf" (include "bitrix.fullname" .) }}
+      - name: errors-html
+        configMap:
+          name: {{ printf "%s-errors.html" (include "bitrix.fullname" .) }}
+      - name: intranet-conf
+        configMap:
+          name: {{ printf "%s-intranet.conf" (include "bitrix.fullname" .) }}
+      - name: resize-cache-conf
+        configMap:
+          name: {{ printf "%s-resize-cache.conf" (include "bitrix.fullname" .) }}                
+      - name: scripts
+        configMap:
+          name: {{ printf "%s-scripts" (include "bitrix.fullname" .) }}
+          defaultMode: 0755
+      {{- if include "bitrix.gitEnabled" . }}   
+      - name: git-ssh
+        secret:
+          secretName: {{ printf "%s-git-ssh" (include "bitrix.fullname" .) }}    
+      - name: gitignore    
+        configMap:
+          name: {{ printf "%s-gitignore" (include "bitrix.fullname" .) }}
+      {{- end }}    
+      - name: configs 
+        secret:
+          secretName: {{ printf "%s-configs" (include "bitrix.fullname" .) }}
+      - name: index
+        configMap:
+          name: {{ printf "%s-index" (include "bitrix.fullname" .) }}
+      {{- if and (include "bitrix.isAdmin" .) (include "bitrix.cronEnabled" .) }}    
+      - name: cron
+        configMap:
+          name: {{ printf "%s-cron" (include "bitrix.fullname" .) }}
+      - name: cron-events
+        configMap:
+          name: {{ printf "%s-cron-events" (include "bitrix.fullname" .) }}
+      {{- end }}
+      - name: ssl-conf
+        configMap:
+          name: {{ printf "%s-ssl.conf" (include "bitrix.fullname" .) }}          
+      - name: msmtprc
+        secret:
+          secretName: {{ printf "%s-msmtprc" (include "bitrix.fullname" .) }}  
+      - name: tls
+        secret:
+          secretName: {{ include "bitrix.tlsSecretName" . }}
+      {{- if (include "bitrix.isAdmin" .) }}     
+      - name: root
+        persistentVolumeClaim:
+          claimName: {{ printf "%s-root-pvc" (include "bitrix.fullname" .) }}
+      {{- end }}    
+      - name: upload
+        persistentVolumeClaim:
+          claimName: {{ printf "%s-upload-pvc" (include "bitrix.fullname" .) }}
+      {{- if include "bitrix.isAdmin" . }}    
+      - name: backup
+        persistentVolumeClaim:
+          claimName: {{ printf "%s-backup-pvc" (include "bitrix.fullname" .) }}
+      {{- end }}         
+      {{- if include "bitrix.isProd" . }}
+      - name: cache
+        emptyDir: {}
+      {{- end }}

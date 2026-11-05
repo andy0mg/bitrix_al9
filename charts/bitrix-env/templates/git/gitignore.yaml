@@ -1,0 +1,31 @@
+{{- if include "bitrix.gitEnabled" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-gitignore" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+data:
+  .gitignore: |
+    lost+found
+    .DS_Store
+    bitrix/cache/
+    bitrix/managed_cache/
+    bitrix/admin/
+    tmp/
+    bitrix/stack_cache/
+    bitrix/site_checker*
+    upload/
+    bitrix/.settings.php
+    bitrix/.settings_extra.php
+    bitrix/php_interface/dbconn.php
+    bitrix/php_interface/after_connect_d7.php
+    bitrix/php_interface/cron_events.php
+    bitrixsetup.php
+    bitrixsetup.update/
+    /documentgenerator/
+    restore.php
+    *.log
+    *.swp
+{{- end }}

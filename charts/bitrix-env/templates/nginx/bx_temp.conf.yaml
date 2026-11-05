@@ -1,0 +1,20 @@
+apiVersion: v1
+data:
+  bx_temp.conf: |
+    #
+    location ~* ^/bx_tmp_download/ {
+        internal;
+        rewrite /bx_tmp_download/(.+) /.bx_temp/$1 last;
+    }
+    #
+    location ~* ^/.bx_temp/ {
+        internal;
+        root /home/.bx_temp;
+    }
+    #
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-bx-temp.conf" (include "bitrix.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}

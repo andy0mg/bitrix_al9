@@ -1,0 +1,30 @@
+name: common
+home: https://bitnami.com
+sources:
+    - https://github.com/bitnami/charts/tree/main/bitnami/common
+version: 2.37.0
+description: A Library Helm Chart for grouping common logic between bitnami charts. This chart is not deployable by itself.
+keywords:
+    - common
+    - helper
+    - template
+    - function
+    - bitnami
+maintainers:
+    - name: Broadcom, Inc. All Rights Reserved.
+      email: ""
+      url: https://github.com/bitnami/charts
+icon: https://dyltqmyl993wv.cloudfront.net/downloads/logos/bitnami-mark.png
+apiversion: v2
+condition: ""
+tags: ""
+appversion: 2.37.0
+deprecated: false
+annotations:
+    fips: "true"
+    images: |
+        []
+    licenses: Apache-2.0
+kubeversion: ""
+dependencies: []
+type: library
