@@ -1,0 +1,6 @@
+---
+skip_list:
+  # community.mysql оставлен ради совместимости со старыми установками Ansible
+  - fqcn[canonical]
+  # rsync сохраняет симлинки из архива Битрикс, как в мануале
+  - command-instead-of-module

@@ -1,0 +1,54 @@
+---
+- name: Скопировать конфиги MariaDB (my-bx.d/zbx-custom.cnf)
+  ansible.builtin.command: rsync -a --itemize-changes {{ bitrix_config_dir }}/mysql/ /etc/mysql/
+  register: bitrix_rsync
+  changed_when: bitrix_rsync.stdout | length > 0
+  notify: Restart mariadb
+
+- name: Доп. настройки MariaDB (my-bx.d/zz-ansible.cnf)
+  ansible.builtin.template:
+    src: zz-ansible.cnf.j2
+    dest: /etc/mysql/my-bx.d/zz-ansible.cnf
+    mode: "0644"
+  notify: Restart mariadb
+
+- name: Включить и запустить MariaDB
+  ansible.builtin.systemd:
+    name: mariadb
+    enabled: true
+    state: started
+
+- name: Применить новые настройки MariaDB до создания БД
+  ansible.builtin.meta: flush_handlers
+
+# Аналог mariadb-secure-installation (root остаётся на unix_socket, как в мануале)
+- name: Удалить анонимных пользователей
+  community.mysql.mysql_user:
+    name: ""
+    host_all: true
+    state: absent
+    login_unix_socket: /run/mysqld/mysqld.sock
+
+- name: Удалить тестовую БД
+  community.mysql.mysql_db:
+    name: test
+    state: absent
+    login_unix_socket: /run/mysqld/mysqld.sock
+
+- name: Создать БД {{ bitrix_db_name }}
+  community.mysql.mysql_db:
+    name: "{{ bitrix_db_name }}"
+    encoding: utf8mb4
+    collation: utf8mb4_unicode_ci
+    state: present
+    login_unix_socket: /run/mysqld/mysqld.sock
+
+- name: Создать пользователя {{ bitrix_db_user }}
+  community.mysql.mysql_user:
+    name: "{{ bitrix_db_user }}"
+    host: localhost
+    password: "{{ bitrix_db_password }}"
+    priv: "{{ bitrix_db_name }}.*:ALL"
+    state: present
+    login_unix_socket: /run/mysqld/mysqld.sock
+  no_log: true

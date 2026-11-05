@@ -1,0 +1,46 @@
+---
+- name: Проверить, установлен ли уже продукт
+  ansible.builtin.stat:
+    path: "{{ bitrix_site_root }}/bitrix"
+  register: bitrix_installed
+
+- name: Скачать bitrixsetup.php
+  ansible.builtin.get_url:
+    url: "{{ bitrix_setup_script_url }}"
+    dest: "{{ bitrix_site_root }}/bitrixsetup.php"
+    owner: www-data
+    group: www-data
+    mode: "0644"
+  when:
+    - bitrix_download_setup_script | bool
+    - not bitrix_installed.stat.exists
+
+- name: Скачать restore.php
+  ansible.builtin.get_url:
+    url: "{{ bitrix_restore_script_url }}"
+    dest: "{{ bitrix_site_root }}/restore.php"
+    owner: www-data
+    group: www-data
+    mode: "0644"
+  when:
+    - bitrix_download_restore_script | bool
+    - not bitrix_installed.stat.exists
+
+- name: Владелец файлов сайта — www-data
+  ansible.builtin.file:
+    path: "{{ bitrix_site_root }}"
+    owner: www-data
+    group: www-data
+    recurse: true
+  when: not bitrix_installed.stat.exists
+
+- name: Cron для агентов Битрикс
+  ansible.builtin.cron:
+    name: bitrix cron_events
+    user: www-data
+    minute: "*/5"
+    job: >-
+      test -f {{ bitrix_site_root }}/bitrix/modules/main/tools/cron_events.php &&
+      /usr/bin/php -f {{ bitrix_site_root }}/bitrix/modules/main/tools/cron_events.php
+      >/dev/null 2>&1
+  when: bitrix_enable_cron | bool

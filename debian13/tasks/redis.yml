@@ -1,0 +1,55 @@
+---
+- name: Включить vm.overcommit_memory=1 (рекомендация Redis)
+  ansible.posix.sysctl:
+    name: vm.overcommit_memory
+    value: "1"
+    sysctl_file: /etc/sysctl.d/90-redis.conf
+    state: present
+
+- name: Скопировать redis.conf из архива
+  ansible.builtin.copy:
+    src: "{{ bitrix_config_dir }}/redis/redis.conf"
+    dest: /etc/redis/redis.conf
+    remote_src: true
+    owner: redis
+    group: www-data
+    mode: "0640"
+  notify: Restart redis
+
+- name: Основная группа redis = www-data
+  ansible.builtin.user:
+    name: redis
+    group: www-data
+  notify: Restart redis
+
+- name: Права на каталоги Redis
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: redis
+    group: www-data
+    recurse: true
+  loop: [/etc/redis, /var/log/redis, /var/lib/redis]
+
+- name: Каталог override для systemd
+  ansible.builtin.file:
+    path: /etc/systemd/system/redis-server.service.d
+    state: directory
+    mode: "0755"
+
+# В мануале путь redis.service.d; на Debian юнит называется redis-server.service
+# (redis.service — алиас), поэтому кладём override к основному юниту.
+- name: Group=www-data для службы Redis
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/redis-server.service.d/custom.conf
+    content: |
+      [Service]
+      Group=www-data
+    mode: "0644"
+  notify: Restart redis
+
+- name: Включить и запустить Redis
+  ansible.builtin.systemd:
+    name: redis-server
+    enabled: true
+    state: started
+    daemon_reload: true

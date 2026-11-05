@@ -1,0 +1,19 @@
+---
+- name: Установить nftables
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+
+- name: Правила nftables (вход запрещён, кроме нужных портов)
+  ansible.builtin.template:
+    src: nftables.conf.j2
+    dest: /etc/nftables.conf
+    mode: "0644"
+    validate: nft -c -f %s
+  register: bitrix_nft
+
+- name: Включить и применить nftables
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+    state: "{{ 'restarted' if bitrix_nft is changed else 'started' }}"

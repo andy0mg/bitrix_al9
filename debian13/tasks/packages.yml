@@ -1,0 +1,98 @@
+---
+- name: Обновить кэш apt и систему
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: "{{ 'dist' if bitrix_upgrade_system | bool else omit }}"
+    cache_valid_time: 3600
+  register: bitrix_apt_upgrade
+
+- name: Перезагрузить сервер после обновления
+  ansible.builtin.reboot:
+  when:
+    - bitrix_reboot_after_upgrade | bool
+    - bitrix_apt_upgrade is changed
+
+- name: Установить служебные утилиты
+  ansible.builtin.apt:
+    name: [wget, unzip, rsync, python3-pymysql]
+    state: present
+
+# Apache ставим первым, чтобы php8.4 подтянул libapache2-mod-php8.4
+- name: Установить Apache
+  ansible.builtin.apt:
+    name: apache2
+    state: present
+
+- name: Установить PHP {{ bitrix_php_version }}
+  ansible.builtin.apt:
+    name: "{{ bitrix_php_packages + bitrix_php_extra_packages }}"
+    state: present
+  vars:
+    v: "{{ bitrix_php_version }}"
+    bitrix_php_packages:
+      - "php{{ v }}"
+      - "libapache2-mod-php{{ v }}"
+      - "php{{ v }}-cli"
+      - "php{{ v }}-common"
+      - "php{{ v }}-dev"
+      - "php{{ v }}-gd"
+      - "php{{ v }}-ldap"
+      - "php{{ v }}-mbstring"
+      - "php{{ v }}-mysql"
+      - "php{{ v }}-opcache"
+      - "php{{ v }}-pspell"
+      - "php{{ v }}-xml"
+      - "php{{ v }}-zip"
+      - "php{{ v }}-amqp"
+      - "php{{ v }}-apcu"
+      - php-pear
+
+# Остановить Apache до установки nginx: оба по умолчанию слушают 80-й порт
+- name: Узнать, перенастроен ли уже Apache на 8090
+  ansible.builtin.command: grep -q 'Listen 8090' /etc/apache2/ports.conf
+  register: bitrix_apache_ported
+  changed_when: false
+  failed_when: false
+
+- name: Остановить Apache (порт 80 нужен nginx)
+  ansible.builtin.systemd:
+    name: apache2
+    state: stopped
+  when: bitrix_apache_ported.rc != 0
+
+- name: Установить Nginx, MariaDB
+  ansible.builtin.apt:
+    name: [nginx, mariadb-server, mariadb-common]
+    state: present
+
+- name: Установить Redis
+  ansible.builtin.apt:
+    name: redis-server
+    state: present
+  when: bitrix_install_redis | bool
+
+- name: Почтовый агент exim4 (internet site)
+  when: bitrix_install_mta | bool
+  block:
+    - name: Ответы debconf для exim4
+      ansible.builtin.debconf:
+        name: exim4-config
+        question: "{{ item.q }}"
+        value: "{{ item.v }}"
+        vtype: "{{ item.t }}"
+      loop:
+        - {q: exim4/dc_eximconfig_configtype, v: "internet site; mail is sent and received directly using SMTP", t: select}
+        - {q: exim4/mailname, v: "{{ bitrix_mta_hostname }}", t: string}
+        - {q: exim4/dc_local_interfaces, v: "127.0.0.1 ; ::1", t: string}
+
+    - name: Установить exim4
+      ansible.builtin.apt:
+        name: exim4-daemon-light
+        state: present
+
+    - name: Режим internet в update-exim4.conf.conf
+      ansible.builtin.lineinfile:
+        path: /etc/exim4/update-exim4.conf.conf
+        regexp: "^dc_eximconfig_configtype="
+        line: "dc_eximconfig_configtype='internet'"
+      notify: Restart exim4

@@ -1,0 +1,13 @@
+---
+- name: Скачать архив конфигураций Битрикс
+  ansible.builtin.get_url:
+    url: "{{ bitrix_config_archive_url }}"
+    dest: /opt/debian.zip
+    mode: "0644"
+
+- name: Распаковать архив в /opt
+  ansible.builtin.unarchive:
+    src: /opt/debian.zip
+    dest: /opt
+    remote_src: true
+    creates: "{{ bitrix_config_dir }}"

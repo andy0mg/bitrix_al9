@@ -1,0 +1,41 @@
+---
+- name: Скопировать PHP-конфиги в mods-available
+  ansible.builtin.command: >-
+    rsync -a --itemize-changes {{ bitrix_config_dir }}/php.d/
+    /etc/php/{{ bitrix_php_version }}/mods-available/
+  register: bitrix_rsync
+  changed_when: bitrix_rsync.stdout | length > 0
+  notify: Restart apache
+
+- name: Подключить zbx-bitrix.ini для apache2 и cli
+  ansible.builtin.file:
+    src: "/etc/php/{{ bitrix_php_version }}/mods-available/zbx-bitrix.ini"
+    dest: "/etc/php/{{ bitrix_php_version }}/{{ item }}/conf.d/99-bitrix.ini"
+    state: link
+    force: true
+  loop: [apache2, cli]
+  notify: Restart apache
+
+- name: Каталог логов PHP
+  ansible.builtin.file:
+    path: /var/log/php
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+
+- name: Локальные настройки PHP
+  ansible.builtin.template:
+    src: bitrix-local.ini.j2
+    dest: "/etc/php/{{ bitrix_php_version }}/mods-available/bitrix-local.ini"
+    mode: "0644"
+  notify: Restart apache
+
+- name: Подключить bitrix-local.ini (после 99-bitrix.ini)
+  ansible.builtin.file:
+    src: "/etc/php/{{ bitrix_php_version }}/mods-available/bitrix-local.ini"
+    dest: "/etc/php/{{ bitrix_php_version }}/{{ item }}/conf.d/99-zz-bitrix-local.ini"
+    state: link
+    force: true
+  loop: [apache2, cli]
+  notify: Restart apache

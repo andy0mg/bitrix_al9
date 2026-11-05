@@ -1,0 +1,4 @@
+; {{ ansible_managed }}
+{% for k, v in bitrix_php_settings.items() %}
+{{ k }} = {{ v }}
+{% endfor %}

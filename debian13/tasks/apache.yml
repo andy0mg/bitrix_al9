@@ -1,0 +1,78 @@
+---
+- name: Скопировать конфиги Apache (Listen 8090, DocumentRoot bx-site)
+  ansible.builtin.command: rsync -a --itemize-changes {{ bitrix_config_dir }}/apache2/ /etc/apache2/
+  register: bitrix_rsync
+  changed_when: bitrix_rsync.stdout | length > 0
+  notify: Restart apache
+
+- name: Apache слушает только {{ bitrix_apache_listen }}
+  ansible.builtin.lineinfile:
+    path: /etc/apache2/ports.conf
+    regexp: '^Listen\s+(\S+:)?8090\s*$'
+    line: "Listen {{ bitrix_apache_listen }}"
+  notify: Restart apache
+
+# Общий /tmp с остальной системой, как в bitrix-gt (иначе php в apache не видит
+# временные файлы, созданные cron/cli)
+- name: Каталог override для apache2
+  ansible.builtin.file:
+    path: /etc/systemd/system/apache2.service.d
+    state: directory
+    mode: "0755"
+
+- name: PrivateTmp=false для apache2
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/apache2.service.d/bitrix.conf
+    content: |
+      [Service]
+      PrivateTmp=false
+    mode: "0644"
+  notify: Restart apache
+
+- name: Переменная окружения BITRIX_VA_VER для PHP
+  ansible.builtin.copy:
+    dest: /etc/apache2/conf-available/bitrix-env.conf
+    content: |
+      # Managed by Ansible
+      SetEnv BITRIX_VA_VER {{ bitrix_va_ver }}
+    mode: "0644"
+  when: bitrix_va_ver | length > 0
+  notify: Restart apache
+
+- name: Включить или выключить bitrix-env.conf
+  ansible.builtin.command: "{{ 'a2enconf' if bitrix_va_ver | length > 0 else 'a2disconf' }} bitrix-env"
+  register: bitrix_a2conf
+  changed_when: "'already' not in bitrix_a2conf.stdout and 'does not exist' not in bitrix_a2conf.stderr"
+  failed_when: bitrix_a2conf.rc != 0 and 'does not exist' not in bitrix_a2conf.stderr
+  notify: Restart apache
+
+- name: Отключить autoindex
+  ansible.builtin.command: a2dismod --force autoindex
+  register: bitrix_a2dismod
+  changed_when: "'already disabled' not in bitrix_a2dismod.stdout"
+  notify: Restart apache
+
+- name: Включить rewrite и php{{ bitrix_php_version }}
+  community.general.apache2_module:
+    name: "{{ item }}"
+    state: present
+  loop: [rewrite, env, "php{{ bitrix_php_version }}"]
+  notify: Restart apache
+
+- name: Корень сайта
+  ansible.builtin.file:
+    path: "{{ bitrix_site_root }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+
+- name: Проверить конфигурацию Apache
+  ansible.builtin.command: apache2ctl configtest
+  changed_when: false
+
+- name: Включить и запустить Apache
+  ansible.builtin.systemd:
+    name: apache2
+    enabled: true
+    state: started
