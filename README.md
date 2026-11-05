@@ -338,3 +338,9 @@ PHP обрабатывается через **nginx + php-fpm** (по умолч
 В каталоге [`debian13/`](debian13/) лежит Ansible-плейбук для установки окружения
 1С-Битрикс «Управление сайтом» на Debian 13 по официальному мануалу. Подробности в
 [`debian13/README.md`](debian13/README.md).
+
+Всё нужное скачивает и запускает скрипт [`debian13/install.sh`](debian13/install.sh):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/andy0mg/bitrix_al9/main/debian13/install.sh | bash -s -- --run
+```
