@@ -15,10 +15,17 @@ Push-сервер не ставится: для «Управления сайт�
 curl -fsSL https://raw.githubusercontent.com/andy0mg/bitrix_al9/main/debian13/install.sh | bash -s -- --run
 ```
 
-Без `--run` только скачивает: поправьте `group_vars/all.yml` и запустите плейбук сами.
+После скачивания скрипт спрашивает, что ставить: обновление ОС и перезагрузку, Redis,
+exim4, фаервол nftables, cron агентов, `bitrixsetup.php`/`restore.php`, `BITRIX_VA_VER`,
+имя БД и пользователя. Ответы сохраняются в `/opt/bitrix-ansible/local.yml`, передаются
+плейбуку через `-e @local.yml` и при следующем запуске предлагаются по умолчанию.
+`--yes` пропускает вопросы, `--configure` задаёт их заново. Без терминала (например, в CI)
+вопросы не задаются.
+
+Без `--run` только скачивает: поправьте ответы или `group_vars/all.yml` и запустите плейбук сами.
 Параметры: `--dir`, `--branch`, а всё после `--` уходит в `ansible-playbook`
 (например `-- -e bitrix_configure_firewall=true`). Повторный запуск обновляет плейбук,
-но сохраняет `inventory.ini`, `group_vars/all.yml` и `credentials/`.
+но сохраняет `inventory.ini`, `group_vars/all.yml`, `local.yml` и `credentials/`.
 
 ## Запуск вручную (с управляющей машины)
 

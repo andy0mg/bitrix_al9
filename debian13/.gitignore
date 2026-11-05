@@ -1,3 +1,4 @@
 credentials/
 inventory.ini
 .ansible/
+local.yml
