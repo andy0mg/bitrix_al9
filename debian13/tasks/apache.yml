@@ -52,11 +52,15 @@
   changed_when: "'already disabled' not in bitrix_a2dismod.stdout"
   notify: Restart apache
 
+# Только снимаем ссылки в mods-enabled: apache2_module/a2dismod падают,
+# если модуль другой версии PHP вообще не установлен
 - name: Отключить модули Apache других версий PHP
-  community.general.apache2_module:
-    name: "php{{ item }}"
+  ansible.builtin.file:
+    path: "/etc/apache2/mods-enabled/php{{ item.0 }}.{{ item.1 }}"
     state: absent
-  loop: "{{ bitrix_php_supported_versions | reject('equalto', bitrix_php_version | string) | list }}"
+  loop: "{{ bitrix_php_supported_versions | reject('equalto', bitrix_php_version | string) | product(['load', 'conf']) | list }}"
+  loop_control:
+    label: "php{{ item.0 }}.{{ item.1 }}"
   notify: Restart apache
 
 - name: Включить rewrite и php{{ bitrix_php_version }}
