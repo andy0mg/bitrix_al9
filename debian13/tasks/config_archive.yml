@@ -5,9 +5,11 @@
     dest: /opt/debian.zip
     mode: "0644"
 
+# В debian.zip пути записаны с обратными слешами: unzip распаковывает всё,
+# но возвращает код 1 (warning), из-за чего модуль unarchive падает.
 - name: Распаковать архив в /opt
-  ansible.builtin.unarchive:
-    src: /opt/debian.zip
-    dest: /opt
-    remote_src: true
-    creates: "{{ bitrix_config_dir }}"
+  ansible.builtin.command:
+    cmd: unzip -o /opt/debian.zip -d /opt
+    creates: "{{ bitrix_config_dir }}/redis/redis.conf"
+  register: bitrix_unzip
+  failed_when: bitrix_unzip.rc > 1
