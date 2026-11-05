@@ -3,7 +3,12 @@
 bitrix_config_archive_url: https://dev.1c-bitrix.ru/docs/chm_files/debian.zip
 bitrix_config_dir: /opt/debian
 
+# Версия PHP. В Debian 13 штатно есть только 8.4; для 8.1, 8.2, 8.3 и 8.5
+# автоматически подключается репозиторий packages.sury.org.
 bitrix_php_version: "8.4"
+bitrix_php_supported_versions: ["8.1", "8.2", "8.3", "8.4", "8.5"]
+# Подключать sury и для 8.4 (свежие патч-релизы). По умолчанию только для не-8.4.
+bitrix_php_force_sury: false
 bitrix_site_root: /var/www/html/bx-site
 bitrix_setup_script_url: https://www.1c-bitrix.ru/download/scripts/bitrixsetup.php
 bitrix_download_setup_script: true
@@ -27,7 +32,7 @@ bitrix_extra_ports: []   # например [8890, 8891] для NTLM
 
 # Дополнительные пакеты сверх списка из мануала
 bitrix_php_extra_packages:
-  - "php8.4-curl"   # нужен многим модулям и Marketplace
+  - "php{{ bitrix_php_version }}-curl"   # нужен многим модулям и Marketplace
   - catdoc          # индексация doc-файлов модулем поиска
 
 # Пароль БД: если пусто, генерируется и сохраняется на управляющей машине

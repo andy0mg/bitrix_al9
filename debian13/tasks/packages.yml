@@ -17,7 +17,29 @@
     name: [wget, unzip, rsync, python3-pymysql]
     state: present
 
-# Apache ставим первым, чтобы php8.4 подтянул libapache2-mod-php8.4
+- name: Проверить версию PHP
+  ansible.builtin.assert:
+    that: bitrix_php_version | string in bitrix_php_supported_versions
+    fail_msg: "bitrix_php_version={{ bitrix_php_version }}; поддерживаются {{ bitrix_php_supported_versions | join(', ') }}"
+
+- name: Репозиторий PHP от sury.org
+  when: bitrix_php_version | string != '8.4' or bitrix_php_force_sury | bool
+  block:
+    - name: Ключ репозитория sury
+      ansible.builtin.apt:
+        deb: https://packages.sury.org/debsuryorg-archive-keyring.deb
+        state: present
+
+    - name: Источник пакетов sury
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/php-sury.list
+        content: >
+          deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg]
+          https://packages.sury.org/php/ {{ ansible_facts.distribution_release }} main
+        mode: "0644"
+      register: bitrix_sury_repo
+
+# Apache ставим первым, чтобы phpX.Y подтянул libapache2-mod-phpX.Y
 - name: Установить Apache
   ansible.builtin.apt:
     name: apache2
@@ -25,8 +47,13 @@
 
 - name: Установить PHP {{ bitrix_php_version }}
   ansible.builtin.apt:
-    name: "{{ bitrix_php_packages + bitrix_php_extra_packages }}"
+    name: >-
+      {{ bitrix_php_packages + bitrix_php_extra_packages
+         + ([] if v is version('8.5', '>=') else ['php' ~ v ~ '-opcache']) }}
     state: present
+    # после подключения sury нужен свежий кэш apt
+    update_cache: "{{ bitrix_sury_repo is defined and bitrix_sury_repo is changed }}"
+  # В PHP 8.5 opcache встроен в ядро, отдельного пакета нет
   vars:
     v: "{{ bitrix_php_version }}"
     bitrix_php_packages:
@@ -39,13 +66,17 @@
       - "php{{ v }}-ldap"
       - "php{{ v }}-mbstring"
       - "php{{ v }}-mysql"
-      - "php{{ v }}-opcache"
       - "php{{ v }}-pspell"
       - "php{{ v }}-xml"
       - "php{{ v }}-zip"
       - "php{{ v }}-amqp"
       - "php{{ v }}-apcu"
       - php-pear
+
+- name: Выбрать PHP по умолчанию для CLI (cron, агенты) {{ bitrix_php_version }}
+  community.general.alternatives:
+    name: php
+    path: "/usr/bin/php{{ bitrix_php_version }}"
 
 # Остановить Apache до установки nginx: оба по умолчанию слушают 80-й порт
 - name: Узнать, перенастроен ли уже Apache на 8090
