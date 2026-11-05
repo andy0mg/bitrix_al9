@@ -132,6 +132,18 @@ ask_str() {    # ask_str переменная "вопрос" значение_п
   echo "$1: \"$ans\"" >> "$LOCAL.tmp"
 }
 
+ask_choice() { # ask_choice переменная "вопрос" по_умолчанию "вариант1 вариант2 ..."
+  local def ans
+  def="$(cur "$1" "$3")"
+  while true; do
+    read -r -p "  $2 {${4// /|}} [$def]: " ans </dev/tty || ans=""
+    ans="${ans:-$def}"
+    [[ " $4 " == *" $ans "* ]] && break
+    echo "    допустимо: $4" >/dev/tty
+  done
+  echo "$1: \"$ans\"" >> "$LOCAL.tmp"
+}
+
 if [[ "$ASK" == "auto" ]]; then
   if [[ -r /dev/tty ]] && { : </dev/tty; } 2>/dev/null; then ASK=yes; else ASK=no; fi
 fi
@@ -140,6 +152,7 @@ if [[ "$ASK" == "yes" ]]; then
   echo
   echo "==> Выберите компоненты (Enter — оставить значение в скобках)"
   : > "$LOCAL.tmp"
+  ask_choice bitrix_php_version        "Версия PHP (8.4 из Debian, остальные из sury)" "8.4" "8.1 8.2 8.3 8.4 8.5"
   ask_bool bitrix_upgrade_system        "Обновить систему (apt dist-upgrade)?"          true
   ask_bool bitrix_reboot_after_upgrade  "Перезагрузить сервер после обновления?"        false
   ask_bool bitrix_install_redis         "Установить Redis?"                             true

@@ -2,7 +2,7 @@
 
 Плейбук повторяет главу курса «Настройка окружения Debian 13»
 (https://dev.1c-bitrix.ru/learning/course/?COURSE_ID=32&CHAPTER_ID=032912):
-Apache 2.4 + PHP 8.4 (mod_php, порт 8090) за Nginx, MariaDB, Redis,
+Apache 2.4 + PHP (по умолчанию 8.4, можно 8.1–8.5; mod_php, порт 8090) за Nginx, MariaDB, Redis,
 конфиги из официального архива `debian.zip`, загрузка `bitrixsetup.php`.
 Push-сервер не ставится: для «Управления сайтом» он не нужен (по мануалу).
 
@@ -16,7 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/andy0mg/bitrix_al9/main/debian13/in
 ```
 
 После скачивания скрипт спрашивает, что ставить: обновление ОС и перезагрузку, Redis,
-exim4, фаервол nftables, cron агентов, `bitrixsetup.php`/`restore.php`, `BITRIX_VA_VER`,
+exim4, фаервол nftables, cron агентов, версию PHP, `bitrixsetup.php`/`restore.php`, `BITRIX_VA_VER`,
 имя БД и пользователя. Ответы сохраняются в `/opt/bitrix-ansible/local.yml`, передаются
 плейбуку через `-e @local.yml` и при следующем запуске предлагаются по умолчанию.
 `--yes` пропускает вопросы, `--configure` задаёт их заново. Без терминала (например, в CI)
@@ -52,6 +52,7 @@ ansible-playbook -i inventory.ini site.yml
 | `bitrix_enable_cron` | `true` | `cron_events.php` раз в 5 минут от www-data |
 | `bitrix_install_mta` | `false` | exim4 (internet site) для отправки почты |
 | `bitrix_mysql_settings` | см. файл | доп. параметры MariaDB |
+| `bitrix_php_version` | `8.4` | версия PHP: 8.4 из Debian, 8.1/8.2/8.3/8.5 из packages.sury.org |
 | `bitrix_va_ver` | `9.0.7` | `SetEnv BITRIX_VA_VER` в Apache, чтобы проверки Битрикса не ругались |
 | `bitrix_apache_listen` | `127.0.0.1:8090` | адрес Apache за nginx |
 | `bitrix_download_setup_script` | `true` | Скачать `bitrixsetup.php` в корень сайта |
