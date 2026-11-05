@@ -30,6 +30,7 @@ cluster/cluster.env.example
             printf '%s\n' ${common} \
                 cluster/install-app.sh \
                 cluster/templates/transformer/transformer.env.tpl \
+                cluster/templates/nginx-app-forwarded.conf.tpl \
                 cluster/templates/nginx-bitrix-php-fpm.inc.tpl \
                 cluster/templates/php-fpm-www.conf.tpl \
                 cluster/templates/memcached.tpl
