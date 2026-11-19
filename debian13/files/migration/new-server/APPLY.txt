@@ -1,21 +1,27 @@
 Ручное применение на НОВОМ сервере (10.254.61.6)
 
+Сайты:
+  petrovichjob.ru / www — основной портал (default + ssl.default)
+  petrovich.tech        — отдельный vhost → apache /it/ + push
+  petlocal.ru           — deny all (заглушка + сертификат)
+
 1) Сертификаты — см. ../certs.example/README.txt
+   (cert.pem/cert.key должны быть для petrovichjob.ru)
 
 2) Конфиги:
    cp ssl-params.conf /etc/nginx/conf.d/ssl-params.conf
    cp petrovich.tech.conf petlocal.ru.conf ssl.default.conf /etc/nginx/sites-available/
+   sed -i 's/server_name _;/server_name petrovichjob.ru www.petrovichjob.ru _;/' \
+     /etc/nginx/sites-available/default.conf
 
-3) Таймауты в /etc/nginx/nginx.conf (по желанию, как на старом):
+3) Таймауты в /etc/nginx/nginx.conf (по желанию):
    proxy_send_timeout  2400;
    proxy_read_timeout  2400;
 
 4) nginx -t && systemctl reload nginx
 
-5) Проверка:
-   curl -kI --resolve petrovich.tech:443:127.0.0.1 https://petrovich.tech/
+5) Проверка на новом:
+   curl -sI -H 'Host: petrovichjob.ru' http://127.0.0.1/
+   curl -kI --resolve petrovichjob.ru:443:127.0.0.1 https://petrovichjob.ru/
    curl -sI -H 'Host: petrovich.tech' http://127.0.0.1/
-
-Push (nodejs_sub/nodejs_pub → push:8010…) должен слушать на 127.0.0.1
-(в /etc/hosts уже есть «127.0.0.1 push httpd» из плейбука).
-Если push ещё не поднят — location /bitrix/sub* будут 502, остальной сайт — ок.
+   curl -kI --resolve petrovich.tech:443:127.0.0.1 https://petrovich.tech/

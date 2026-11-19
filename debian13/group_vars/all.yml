@@ -88,6 +88,8 @@ bitrix_ssl_dhparam: "{{ bitrix_ssl_dir }}/dhparam.pem"
 
 bitrix_default_ssl_cert: cert.pem
 bitrix_default_ssl_key: cert.key
+# Основной сайт (default HTTP/HTTPS). На старом — server_name _ в s1/ssl.s1.
+bitrix_main_server_names: "petrovichjob.ru www.petrovichjob.ru _"
 
 bitrix_petrovich_server_name: petrovich.tech
 bitrix_petrovich_cert: petrovich.tech.pem

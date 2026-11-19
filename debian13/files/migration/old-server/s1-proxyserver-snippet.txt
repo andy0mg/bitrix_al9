@@ -1,22 +1,25 @@
-# Правки на СТАРОМ сервере для default-сайта (s1.conf / ssl.s1.conf),
-# чтобы основной портал тоже шёл на новый, пока не сменили маршрутизацию.
+# Правки на СТАРОМ для ОСНОВНОГО сайта petrovichjob.ru
+# (default: s1.conf / ssl.s1.conf), чтобы он шёл на новый.
 #
-# В обоих файлах замените:
+# В /etc/nginx/bx/site_enabled/s1.conf и ssl.s1.conf:
 #
-#   set $proxyserver        "http://127.0.0.1:8888";
-#
-# на:
-#
+# 1) Backend на новый:
 #   set $proxyserver        "http://10.254.61.6";
 #
-# и Host-заголовок (иначе Bitrix может генерировать URL с :80/:443):
-#
-#   # было:  proxy_set_header Host $host:80;   /  $host:443;
+# 2) Host без :80/:443 (важно для petrovichjob.ru):
 #   proxy_set_header Host $host;
 #   proxy_set_header X-Forwarded-Proto $scheme;
 #   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 #
-# location = /petlocal/potok/addVacancy.php можно оставить на старом
-# или удалить — на новом он уже в ssl.default.conf.
+# 3) Опционально явно:
+#   server_name petrovichjob.ru www.petrovichjob.ru _;
+#
+# location potok можно оставить или убрать (на новом уже в ssl.default.conf).
+#
+# petrovich.tech — отдельно: замените файл на zz-proxy-to-new.conf
 #
 # Затем: nginx -t && systemctl reload nginx
+#
+# Проверка со старого:
+#   curl -sI -H 'Host: petrovichjob.ru' http://10.254.61.6/
+#   curl -kI --resolve petrovichjob.ru:443:10.254.61.6 https://petrovichjob.ru/
