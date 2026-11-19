@@ -2,3 +2,7 @@ credentials/
 inventory.ini
 .ansible/
 local.yml
+# SSL из миграции — не коммитить
+files/migration/**/*.pem
+files/migration/**/*.key
+files/migration/ssl-backup/

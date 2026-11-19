@@ -31,6 +31,9 @@
       ansible.builtin.import_tasks: tasks/apache.yml
     - name: Nginx
       ansible.builtin.import_tasks: tasks/nginx.yml
+    - name: Nginx кастомы (petrovich.tech / petlocal.ru / SSL)
+      ansible.builtin.import_tasks: tasks/nginx_custom.yml
+      when: bitrix_enable_custom_sites | bool
     - name: MariaDB
       ansible.builtin.import_tasks: tasks/mariadb.yml
     - name: Redis

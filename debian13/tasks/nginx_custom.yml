@@ -1,0 +1,124 @@
+---
+# Кастомные vhost и сертификаты (миграция со старого BitrixEnv)
+
+- name: Каталог для SSL-сертификатов
+  ansible.builtin.file:
+    path: "{{ bitrix_ssl_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Проверить bitrix_ssl_cert_source
+  ansible.builtin.stat:
+    path: "{{ bitrix_ssl_cert_source }}"
+  register: bitrix_ssl_source_stat
+  when: bitrix_ssl_cert_source | length > 0
+
+- name: Скопировать сертификаты из bitrix_ssl_cert_source
+  ansible.builtin.copy:
+    src: "{{ bitrix_ssl_cert_source }}/"
+    dest: "{{ bitrix_ssl_dir }}/"
+    owner: root
+    group: root
+    mode: "0640"
+    directory_mode: "0755"
+  when:
+    - bitrix_ssl_cert_source | length > 0
+    - bitrix_ssl_source_stat.stat.exists | default(false)
+    - bitrix_ssl_source_stat.stat.isdir | default(false)
+  notify: Reload nginx
+
+- name: Проверить наличие нужных сертификатов
+  ansible.builtin.stat:
+    path: "{{ bitrix_ssl_dir }}/{{ item }}"
+  loop:
+    - "{{ bitrix_default_ssl_cert }}"
+    - "{{ bitrix_default_ssl_key }}"
+    - "{{ bitrix_petrovich_cert }}"
+    - "{{ bitrix_petrovich_key }}"
+    - "{{ bitrix_petlocal_cert }}"
+    - "{{ bitrix_petlocal_key }}"
+  register: bitrix_ssl_files
+
+- name: Факт — все обязательные сертификаты на месте
+  ansible.builtin.set_fact:
+    bitrix_ssl_ready: "{{ bitrix_ssl_files.results | map(attribute='stat.exists') | min }}"
+
+- name: Предупредить, если сертификатов ещё нет
+  ansible.builtin.debug:
+    msg: >-
+      Нет файла {{ item.item }} в {{ bitrix_ssl_dir }}.
+      Скопируйте со старого (files/migration/certs.example/README.txt)
+      или задайте bitrix_ssl_cert_source. SSL-vhost не будут включены, пока файлов нет.
+  loop: "{{ bitrix_ssl_files.results }}"
+  when: not item.stat.exists
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Проверить dhparam
+  ansible.builtin.stat:
+    path: "{{ bitrix_ssl_dhparam }}"
+  register: bitrix_dhparam_stat
+  when:
+    - bitrix_ssl_ready | bool
+    - bitrix_ssl_dhparam | length > 0
+
+- name: Убрать dhparam из шаблона, если файла нет
+  ansible.builtin.set_fact:
+    bitrix_ssl_dhparam: ""
+  when:
+    - bitrix_ssl_ready | bool
+    - bitrix_ssl_dhparam | length > 0
+    - not (bitrix_dhparam_stat.stat.exists | default(false))
+
+- name: Общие SSL-параметры
+  ansible.builtin.template:
+    src: nginx/ssl-params.conf.j2
+    dest: /etc/nginx/conf.d/ssl-params.conf
+    mode: "0644"
+  when: bitrix_ssl_ready | bool
+  notify: Reload nginx
+
+- name: Vhost petrovich.tech
+  ansible.builtin.template:
+    src: nginx/petrovich.tech.conf.j2
+    dest: /etc/nginx/sites-available/petrovich.tech.conf
+    mode: "0644"
+  when: bitrix_ssl_ready | bool
+  notify: Reload nginx
+
+- name: Vhost petlocal.ru
+  ansible.builtin.template:
+    src: nginx/petlocal.ru.conf.j2
+    dest: /etc/nginx/sites-available/petlocal.ru.conf
+    mode: "0644"
+  when: bitrix_ssl_ready | bool
+  notify: Reload nginx
+
+- name: Default SSL (с potok)
+  ansible.builtin.template:
+    src: nginx/ssl.default.conf.j2
+    dest: /etc/nginx/sites-available/ssl.default.conf
+    mode: "0644"
+  when: bitrix_ssl_ready | bool
+  notify: Reload nginx
+
+- name: Увеличить proxy_*_timeout в nginx.conf (как на старом)
+  ansible.builtin.replace:
+    path: /etc/nginx/nginx.conf
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  loop:
+    - regexp: '(\s+proxy_send_timeout\s+)\d+;'
+      replace: '\g<1>{{ bitrix_proxy_send_timeout }};'
+    - regexp: '(\s+proxy_read_timeout\s+)\d+;'
+      replace: '\g<1>{{ bitrix_proxy_read_timeout }};'
+    - regexp: '(\s+proxy_connect_timeout\s+)\d+;'
+      replace: '\g<1>{{ bitrix_proxy_connect_timeout }};'
+  notify: Reload nginx
+
+- name: Проверить конфигурацию Nginx после кастомов
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  when: bitrix_ssl_ready | bool

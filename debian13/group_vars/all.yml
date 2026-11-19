@@ -77,3 +77,38 @@ bitrix_mta_hostname: "{{ ansible_facts.fqdn }}"
 # Нужна, чтобы «Проверка системы» и монитор качества не ругались на окружение.
 # Пустая строка отключает. Сверьте с актуальной версией bitrix-env.
 bitrix_va_ver: "9.0.7"
+
+# --- Миграция кастомов со старого BitrixEnv (petrovich.tech / petlocal.ru) ---
+# Включите после копирования сертификатов в bitrix_ssl_dir (или через bitrix_ssl_cert_source).
+bitrix_enable_custom_sites: false
+bitrix_ssl_dir: /etc/nginx/ssl
+# Каталог с копией SSL со старого сервера (на управляющей машине). Пусто = не копировать.
+bitrix_ssl_cert_source: ""
+bitrix_ssl_dhparam: "{{ bitrix_ssl_dir }}/dhparam.pem"
+
+bitrix_default_ssl_cert: cert.pem
+bitrix_default_ssl_key: cert.key
+# Основной сайт (default HTTP/HTTPS). На старом — server_name _ в s1/ssl.s1.
+bitrix_main_server_names: "petrovichjob.ru www.petrovichjob.ru _"
+
+bitrix_petrovich_server_name: petrovich.tech
+bitrix_petrovich_cert: petrovich.tech.pem
+bitrix_petrovich_key: petrovich.tech.key
+bitrix_petrovich_proxy_prefix: /it/
+bitrix_petrovich_client_max_body_size: 1000M
+
+bitrix_petlocal_server_name: petlocal.ru
+bitrix_petlocal_cert: petlocal.ru2025.pem
+bitrix_petlocal_key: petlocal.ru2025.key
+
+# location /petlocal/potok/addVacancy.php на default HTTPS
+bitrix_potok_enabled: true
+
+# Таймауты proxy как на старом (там было 2400)
+bitrix_proxy_connect_timeout: 300
+bitrix_proxy_send_timeout: 2400
+bitrix_proxy_read_timeout: 2400
+
+# IP для подсказок по временному proxy old→new
+bitrix_old_server_ip: "10.21.62.180"
+bitrix_new_server_ip: "10.254.61.6"

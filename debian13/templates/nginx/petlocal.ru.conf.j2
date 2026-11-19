@@ -1,0 +1,16 @@
+# petlocal.ru — как на старом: только TLS, deny all (заглушка + сертификат)
+server {
+    listen 80;
+    listen [::]:80;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+
+    server_name {{ bitrix_petlocal_server_name }};
+
+    ssl_certificate     {{ bitrix_ssl_dir }}/{{ bitrix_petlocal_cert }};
+    ssl_certificate_key {{ bitrix_ssl_dir }}/{{ bitrix_petlocal_key }};
+    include conf.d/ssl-params.conf;
+
+    deny all;
+}

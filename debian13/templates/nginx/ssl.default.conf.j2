@@ -1,0 +1,48 @@
+# Default HTTPS (аналог ssl.s1.conf со старого сервера)
+server {
+    listen 443 default_server ssl;
+    listen [::]:443 default_server ssl;
+    http2 on;
+    server_name {{ bitrix_main_server_names }};
+    server_name_in_redirect off;
+
+    ssl_certificate     {{ bitrix_ssl_dir }}/{{ bitrix_default_ssl_cert }};
+    ssl_certificate_key {{ bitrix_ssl_dir }}/{{ bitrix_default_ssl_key }};
+    include conf.d/ssl-params.conf;
+
+    access_log /var/log/nginx/access_ssl.log json;
+    error_log  /var/log/nginx/error_ssl.log warn;
+
+    proxy_set_header X-Real-IP       $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Host            $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header HTTPS           YES;
+
+    proxy_redirect ~^(http://[^:]+):\d+(/.+)$ $1$2;
+    proxy_redirect ~^(https://[^:]+):\d+(/.+)$ $1$2;
+
+    set $docroot "{{ bitrix_site_root }}";
+    index index.php;
+    root "{{ bitrix_site_root }}";
+
+{% if bitrix_potok_enabled | bool %}
+    # Кастом со старого ssl.s1.conf
+    location = /petlocal/potok/addVacancy.php {
+        proxy_pass          https://{{ bitrix_petlocal_server_name }}/potok/addVacancy.php;
+        proxy_redirect      off;
+        proxy_http_version  1.1;
+
+        proxy_ssl_server_name on;
+        proxy_set_header  Host               {{ bitrix_petlocal_server_name }};
+        proxy_set_header  Upgrade            $http_upgrade;
+        proxy_set_header  Connection         "upgrade";
+        proxy_set_header  X-Real-IP          $remote_addr;
+        proxy_set_header  X-Forwarded-For    $proxy_add_x_forwarded_for;
+        proxy_set_header  X-Forwarded-Proto  https;
+    }
+{% endif %}
+
+    include conf.d/bx_temp.conf;
+    include conf.d/bitrix.conf;
+}

@@ -1,0 +1,11 @@
+# На НОВОМ в /etc/nginx/sites-available/default.conf
+# замените строку server_name:
+#
+#   было:  server_name _;
+#   стало: server_name petrovichjob.ru www.petrovichjob.ru _;
+#
+# Или одной командой:
+#   sed -i 's/server_name _;/server_name petrovichjob.ru www.petrovichjob.ru _;/' \
+#     /etc/nginx/sites-available/default.conf
+#
+# Затем: nginx -t && systemctl reload nginx
