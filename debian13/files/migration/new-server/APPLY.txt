@@ -1,0 +1,21 @@
+Ручное применение на НОВОМ сервере (10.254.61.6)
+
+1) Сертификаты — см. ../certs.example/README.txt
+
+2) Конфиги:
+   cp ssl-params.conf /etc/nginx/conf.d/ssl-params.conf
+   cp petrovich.tech.conf petlocal.ru.conf ssl.default.conf /etc/nginx/sites-available/
+
+3) Таймауты в /etc/nginx/nginx.conf (по желанию, как на старом):
+   proxy_send_timeout  2400;
+   proxy_read_timeout  2400;
+
+4) nginx -t && systemctl reload nginx
+
+5) Проверка:
+   curl -kI --resolve petrovich.tech:443:127.0.0.1 https://petrovich.tech/
+   curl -sI -H 'Host: petrovich.tech' http://127.0.0.1/
+
+Push (nodejs_sub/nodejs_pub → push:8010…) должен слушать на 127.0.0.1
+(в /etc/hosts уже есть «127.0.0.1 push httpd» из плейбука).
+Если push ещё не поднят — location /bitrix/sub* будут 502, остальной сайт — ок.

@@ -1,0 +1,22 @@
+# Правки на СТАРОМ сервере для default-сайта (s1.conf / ssl.s1.conf),
+# чтобы основной портал тоже шёл на новый, пока не сменили маршрутизацию.
+#
+# В обоих файлах замените:
+#
+#   set $proxyserver        "http://127.0.0.1:8888";
+#
+# на:
+#
+#   set $proxyserver        "http://10.254.61.6";
+#
+# и Host-заголовок (иначе Bitrix может генерировать URL с :80/:443):
+#
+#   # было:  proxy_set_header Host $host:80;   /  $host:443;
+#   proxy_set_header Host $host;
+#   proxy_set_header X-Forwarded-Proto $scheme;
+#   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#
+# location = /petlocal/potok/addVacancy.php можно оставить на старом
+# или удалить — на новом он уже в ssl.default.conf.
+#
+# Затем: nginx -t && systemctl reload nginx

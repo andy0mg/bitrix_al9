@@ -67,3 +67,22 @@ cron для агентов, nftables, exim4 в режиме internet site, `vm.o
 `restore.php` и финальная проверка, что `bitrixsetup.php` отдаётся через nginx.
 
 `credentials/` содержит пароли, не коммитьте его (есть в `.gitignore`).
+
+## Миграция кастомов со старого BitrixEnv
+
+Со старого сервера переносятся: сертификаты, `petrovich.tech` (proxy в `/it/` + push),
+`petlocal.ru` (deny all), default HTTPS с `/petlocal/potok/addVacancy.php`, таймауты proxy 2400.
+
+1. Скопируйте SSL (инструкция: [`files/migration/certs.example/README.txt`](files/migration/certs.example/README.txt)).
+2. Либо вручную на новом: [`files/migration/new-server/APPLY.txt`](files/migration/new-server/APPLY.txt),
+   либо через Ansible — в `local.yml` / `-e`:
+   ```yaml
+   bitrix_enable_custom_sites: true
+   # bitrix_ssl_cert_source: /path/to/ssl-backup   # опционально
+   ```
+3. Пока DNS/маршрутизация на старом IP — на старом:
+   - замените `petrovich.tech.conf` на
+     [`files/migration/old-server/zz-proxy-to-new.conf`](files/migration/old-server/zz-proxy-to-new.conf);
+   - для default-сайта — [`s1-proxyserver-snippet.txt`](files/migration/old-server/s1-proxyserver-snippet.txt).
+   **Не** меняйте только upstream `pt_app` на новый IP при старом
+   `proxy_pass .../it/` — получится `/it/it/`.
